@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Storage Locations - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>Storage Locations</h2>
+
+{% if error is defined and error %}
+<article style="background:var(--pico-del-color);color:#fff;padding:0.75rem 1rem">{{ error }}</article>
+{% endif %}
+
+<form method="post" action="/locations" style="display:flex;gap:0.75rem;align-items:end;margin-bottom:2rem">
+    <label style="flex:1;margin-bottom:0">
+        New location name
+        <input type="text" name="name" required placeholder="e.g. Garage Freezer" style="margin-bottom:0">
+    </label>
+    <button type="submit" style="margin-bottom:0">Add</button>
+</form>
+
+{% if locations %}
+<table>
+    <thead>
+        <tr><th>Name</th><th>Added</th></tr>
+    </thead>
+    <tbody>
+        {% for loc in locations %}
+        <tr>
+            <td>{{ loc.name }}</td>
+            <td>{{ loc.created_at.strftime('%Y-%m-%d') if loc.created_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No locations yet.</p>
+{% endif %}
+
+<a href="/">&larr; Back to items</a>
+{% endblock %}

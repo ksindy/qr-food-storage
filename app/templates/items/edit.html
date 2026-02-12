@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ rev.name }} - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>Edit: {{ rev.name }}</h2>
+<p class="item-meta">Editing creates a new revision (revision #{{ rev.revision_num + 1 }}). Previous data is preserved in history.</p>
+
+{% if errors is defined and errors %}
+<article style="background:var(--pico-del-color);color:#fff;padding:0.75rem 1rem">
+    <ul style="margin:0;padding-left:1.2rem">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+</article>
+{% endif %}
+
+<form method="post" action="/i/{{ item.public_id }}/edit" enctype="multipart/form-data">
+    <label>
+        Food item name *
+        <input type="text" name="name" required value="{{ rev.name }}">
+    </label>
+
+    <div class="grid">
+        <label>
+            Date prepared *
+            <input type="date" name="date_prepared" required value="{{ rev.date_prepared }}">
+        </label>
+        <label>
+            Expiration date
+            <input type="date" name="expiration_date" value="{{ rev.expiration_date or '' }}">
+        </label>
+    </div>
+
+    <label>
+        Storage location *
+        <select name="storage_location_id" required>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" {% if loc.id == rev.storage_location_id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    {% if rev.photo_filename %}
+    <label>
+        <input type="checkbox" name="keep_photo" value="true" checked>
+        Keep current photo
+    </label>
+    <img src="{{ photo_url(rev.photo_filename) }}" alt="Current photo" style="max-width:150px;display:block;margin-bottom:0.5rem;border-radius:var(--pico-border-radius)">
+    {% endif %}
+    <label>
+        {% if rev.photo_filename %}Replace photo{% else %}Photo (optional){% endif %}
+        <input type="file" name="photo" accept="image/*">
+    </label>
+
+    <fieldset>
+        <legend>Links</legend>
+        <div id="links-container">
+            {% if rev.links %}
+                {% for link in rev.links %}
+                <div class="link-row">
+                    <input type="url" name="link_urls" value="{{ link.url }}" class="link-url">
+                    <input type="text" name="link_labels" value="{{ link.label or '' }}" placeholder="Label" class="link-label">
+                    <button type="button" class="outline secondary" onclick="this.parentElement.remove()" style="margin-bottom:0">&times;</button>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="link-row">
+                    <input type="url" name="link_urls" placeholder="https://..." class="link-url">
+                    <input type="text" name="link_labels" placeholder="Label (optional)" class="link-label">
+                </div>
+            {% endif %}
+        </div>
+        <button type="button" class="outline secondary" onclick="addLink()" style="margin-top:0.5rem">+ Add another link</button>
+    </fieldset>
+
+    <div style="display:flex;gap:0.75rem">
+        <button type="submit">Save Changes</button>
+        <a href="/i/{{ item.public_id }}" role="button" class="outline secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+function addLink() {
+    const container = document.getElementById('links-container');
+    const row = document.createElement('div');
+    row.className = 'link-row';
+    row.innerHTML = '<input type="url" name="link_urls" placeholder="https://..." class="link-url">'
+        + '<input type="text" name="link_labels" placeholder="Label (optional)" class="link-label">'
+        + '<button type="button" class="outline secondary" onclick="this.parentElement.remove()" style="margin-bottom:0">&times;</button>';
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}History: {{ item.revisions[-1].name if item.revisions else 'Item' }} - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>
+    History:
+    {% if item.revisions %}{{ item.revisions[-1].name }}{% endif %}
+</h2>
+<p><a href="/i/{{ item.public_id }}">&larr; Back to item</a></p>
+
+{% for rev in revisions %}
+<div class="revision-entry {% if rev.is_deleted %}deleted{% endif %}">
+    <div class="rev-header">
+        <strong>Revision #{{ rev.revision_num }}</strong>
+        &mdash; {{ rev.created_at.strftime('%Y-%m-%d %H:%M UTC') }}
+        {% if rev.is_deleted %}<span class="badge badge-deleted">Deleted</span>{% endif %}
+    </div>
+    <table>
+        <tbody>
+            <tr><th>Name</th><td>{{ rev.name }}</td></tr>
+            <tr><th>Date prepared</th><td>{{ rev.date_prepared.strftime('%b %d, %Y') }}</td></tr>
+            <tr><th>Expiration</th><td>{{ rev.expiration_date.strftime('%b %d, %Y') if rev.expiration_date else '—' }}</td></tr>
+            <tr><th>Location</th><td>{{ rev.storage_location.name }}</td></tr>
+            {% if rev.photo_filename %}
+            <tr><th>Photo</th><td><img src="{{ photo_url(rev.photo_filename) }}" alt="" class="photo-thumb"></td></tr>
+            {% endif %}
+            {% if rev.links %}
+            <tr>
+                <th>Links</th>
+                <td>
+                    {% for link in rev.links %}
+                    <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label or link.url }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endblock %}

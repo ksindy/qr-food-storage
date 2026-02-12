@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ rev.name if rev else 'Item' }} - QR Food Storage{% endblock %}
+
+{% block content %}
+{% if is_deleted %}
+<article style="background:var(--pico-muted-color);color:#fff;padding:1rem">
+    <strong>This item has been deleted.</strong>
+    <form method="post" action="/i/{{ item.public_id }}/restore" style="display:inline;margin-left:1rem">
+        <button type="submit" class="outline contrast" style="margin:0;padding:0.25rem 0.75rem">Restore</button>
+    </form>
+</article>
+{% endif %}
+
+{% if rev %}
+<div style="display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:1rem">
+    <div>
+        <h2 style="margin-bottom:0.25rem">{{ rev.name }}</h2>
+        <div class="item-meta">
+            <span class="badge badge-location">{{ rev.storage_location.name }}</span>
+            {% if rev.expiration_date and rev.expiration_date < today and not is_deleted %}
+                <span class="badge badge-expired">Expired</span>
+            {% endif %}
+        </div>
+    </div>
+    <div style="text-align:center">
+        <img src="/i/{{ item.public_id }}/qr.png" alt="QR Code" style="width:120px;height:120px">
+        <br>
+        <small><a href="/i/{{ item.public_id }}/label" target="_blank">Print label</a></small>
+    </div>
+</div>
+
+<table>
+    <tbody>
+        <tr><th>Date prepared</th><td>{{ rev.date_prepared.strftime('%B %d, %Y') }}</td></tr>
+        <tr><th>Expiration date</th><td>{{ rev.expiration_date.strftime('%B %d, %Y') if rev.expiration_date else '—' }}</td></tr>
+        <tr><th>Storage location</th><td>{{ rev.storage_location.name }}</td></tr>
+        <tr><th>Created</th><td>{{ rev.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</td></tr>
+    </tbody>
+</table>
+
+{% if rev.photo_filename %}
+<h4>Photo</h4>
+<img src="{{ photo_url(rev.photo_filename) }}" alt="Food photo" class="item-photo">
+{% endif %}
+
+{% if rev.links %}
+<h4>Links</h4>
+<ul>
+    {% for link in rev.links %}
+    <li><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label or link.url }}</a></li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:2rem">
+    {% if not is_deleted %}
+    <a href="/i/{{ item.public_id }}/edit" role="button">Edit</a>
+    <form method="post" action="/i/{{ item.public_id }}/delete" onsubmit="return confirm('Delete this item?')">
+        <button type="submit" class="secondary">Delete</button>
+    </form>
+    {% endif %}
+    <a href="/i/{{ item.public_id }}/history" role="button" class="outline">View History</a>
+    <a href="/" role="button" class="outline secondary">Back to list</a>
+</div>
+
+{% else %}
+<p>No revision data found for this item.</p>
+{% endif %}
+{% endblock %}

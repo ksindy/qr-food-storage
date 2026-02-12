@@ -1,0 +1,117 @@
+/* Global tweaks */
+body {
+    padding-bottom: 2rem;
+}
+
+/* Item cards in list */
+.item-card {
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.item-card.deleted {
+    opacity: 0.5;
+}
+
+.item-card h3 {
+    margin-bottom: 0.25rem;
+}
+
+.item-meta {
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-location {
+    background: var(--pico-primary-background);
+    color: var(--pico-primary-inverse);
+}
+
+.badge-expired {
+    background: #dc3545;
+    color: #fff;
+}
+
+.badge-deleted {
+    background: var(--pico-muted-color);
+    color: #fff;
+}
+
+/* Photo */
+.item-photo {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: var(--pico-border-radius);
+    object-fit: contain;
+}
+
+.photo-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: var(--pico-border-radius);
+}
+
+/* Links section */
+.link-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: end;
+}
+
+.link-row input {
+    margin-bottom: 0;
+}
+
+.link-row .link-url {
+    flex: 2;
+}
+
+.link-row .link-label {
+    flex: 1;
+}
+
+/* History timeline */
+.revision-entry {
+    border-left: 3px solid var(--pico-primary);
+    padding-left: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.revision-entry.deleted {
+    border-left-color: var(--pico-muted-color);
+}
+
+.revision-entry .rev-header {
+    font-size: 0.85rem;
+    color: var(--pico-muted-color);
+    margin-bottom: 0.25rem;
+}
+
+/* Filters bar */
+.filters {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: end;
+    margin-bottom: 1.5rem;
+}
+
+.filters input,
+.filters select {
+    margin-bottom: 0;
+}
+
+/* ---- Printable label ---- */
+/* This is only in label.html but included here for reference */
