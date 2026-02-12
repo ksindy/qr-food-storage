@@ -398,6 +398,113 @@ def restore_item(public_id: str, db: Session = Depends(get_db)):
     return RedirectResponse(f"/i/{public_id}", status_code=303)
 
 
+# --- Reuse label ---
+
+@router.get("/i/{public_id}/reuse", response_class=HTMLResponse)
+def reuse_form(public_id: str, request: Request, db: Session = Depends(get_db)):
+    item = _get_item_or_404(public_id, db)
+    if not item.is_deleted:
+        return RedirectResponse(f"/i/{public_id}", status_code=303)
+
+    prev = item.latest_revision
+    locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+
+    return templates.TemplateResponse(
+        "items/reuse.html",
+        {
+            "request": request,
+            "public_id": public_id,
+            "prev_name": prev.name if prev else "Unknown",
+            "locations": locations,
+            "today": date.today(),
+            "default_exp": date.today() + timedelta(days=7),
+        },
+    )
+
+
+@router.post("/i/{public_id}/reuse")
+async def reuse_label(
+    public_id: str,
+    request: Request,
+    name: str = Form(...),
+    date_prepared: date = Form(...),
+    expiration_date: Optional[date] = Form(None),
+    storage_location_id: int = Form(...),
+    link_urls: List[str] = Form(default=[]),
+    link_labels: List[str] = Form(default=[]),
+    photo: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
+    item = _get_item_or_404(public_id, db)
+    prev = item.latest_revision
+
+    errors = []
+    if not name.strip():
+        errors.append("Name is required.")
+
+    exp = expiration_date or (date_prepared + timedelta(days=7))
+    if exp < date_prepared:
+        errors.append("Expiration date must be on or after date prepared.")
+
+    clean_links = []
+    for url, label in zip(link_urls, link_labels):
+        url = url.strip()
+        if not url:
+            continue
+        if not URL_RE.match(url):
+            errors.append(f"Invalid URL: {url}")
+        else:
+            clean_links.append((url, label.strip() or None))
+
+    photo_filename = None
+    if photo and photo.filename:
+        try:
+            photo_filename = await save_photo(photo)
+        except ValueError as e:
+            errors.append(str(e))
+
+    if errors:
+        locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+        return templates.TemplateResponse(
+            "items/reuse.html",
+            {
+                "request": request,
+                "public_id": public_id,
+                "prev_name": prev.name if prev else "Unknown",
+                "locations": locations,
+                "today": date.today(),
+                "default_exp": exp,
+                "errors": errors,
+                "form": {
+                    "name": name,
+                    "date_prepared": date_prepared,
+                    "expiration_date": expiration_date,
+                    "storage_location_id": storage_location_id,
+                },
+            },
+        )
+
+    new_num = (prev.revision_num + 1) if prev else 1
+    revision = ItemRevision(
+        item_id=item.id,
+        revision_num=new_num,
+        name=name.strip(),
+        date_prepared=date_prepared,
+        expiration_date=exp,
+        storage_location_id=storage_location_id,
+        photo_filename=photo_filename,
+        is_deleted=False,
+    )
+    db.add(revision)
+    db.flush()
+
+    for url, label in clean_links:
+        db.add(RevisionLink(revision_id=revision.id, url=url, label=label))
+
+    db.commit()
+    return RedirectResponse(f"/i/{public_id}", status_code=303)
+
+
 # --- History ---
 
 @router.get("/i/{public_id}/history", response_class=HTMLResponse)

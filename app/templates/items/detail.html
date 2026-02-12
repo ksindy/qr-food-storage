@@ -5,9 +5,12 @@
 {% if is_deleted %}
 <article style="background:var(--pico-muted-color);color:#fff;padding:1rem">
     <strong>This item has been deleted.</strong>
-    <form method="post" action="/i/{{ item.public_id }}/restore" style="display:inline;margin-left:1rem">
-        <button type="submit" class="outline contrast" style="margin:0;padding:0.25rem 0.75rem">Restore</button>
-    </form>
+    <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap">
+        <a href="/i/{{ item.public_id }}/reuse" role="button" style="margin:0;padding:0.25rem 0.75rem">Reuse this label</a>
+        <form method="post" action="/i/{{ item.public_id }}/restore" style="display:inline">
+            <button type="submit" class="outline contrast" style="margin:0;padding:0.25rem 0.75rem">Restore previous item</button>
+        </form>
+    </div>
 </article>
 {% endif %}
 

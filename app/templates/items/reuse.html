@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Reuse Label - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>Reuse Label</h2>
+<p class="item-meta">This label was previously used for <strong>{{ prev_name }}</strong>. Fill in the new item details below — the QR code stays the same.</p>
+
+{% if errors is defined and errors %}
+<article style="background:var(--pico-del-color);color:#fff;padding:0.75rem 1rem">
+    <ul style="margin:0;padding-left:1.2rem">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+</article>
+{% endif %}
+
+<form method="post" action="/i/{{ public_id }}/reuse" enctype="multipart/form-data">
+    <label>
+        Food item name *
+        <input type="text" name="name" required value="{{ form.name if form is defined and form.name else '' }}">
+    </label>
+
+    <div class="grid">
+        <label>
+            Date prepared *
+            <input type="date" name="date_prepared" required value="{{ form.date_prepared if form is defined and form.date_prepared else today }}">
+        </label>
+        <label>
+            Expiration date
+            <input type="date" name="expiration_date" value="{{ form.expiration_date if form is defined and form.expiration_date else default_exp }}">
+        </label>
+    </div>
+
+    <label>
+        Storage location *
+        <select name="storage_location_id" required>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" {% if form is defined and form.storage_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <small><a href="/locations">Manage locations</a></small>
+
+    <label>
+        Photo (optional)
+        <input type="file" name="photo" accept="image/*">
+    </label>
+
+    <fieldset>
+        <legend>Links (optional)</legend>
+        <div id="links-container">
+            <div class="link-row">
+                <input type="url" name="link_urls" placeholder="https://..." class="link-url">
+                <input type="text" name="link_labels" placeholder="Label (optional)" class="link-label">
+            </div>
+        </div>
+        <button type="button" class="outline secondary" onclick="addLink()" style="margin-top:0.5rem">+ Add another link</button>
+    </fieldset>
+
+    <div style="display:flex;gap:0.75rem">
+        <button type="submit">Save New Item</button>
+        <a href="/i/{{ public_id }}" role="button" class="outline secondary">Cancel</a>
+    </div>
+</form>
+
+<script>
+function addLink() {
+    const container = document.getElementById('links-container');
+    const row = document.createElement('div');
+    row.className = 'link-row';
+    row.innerHTML = '<input type="url" name="link_urls" placeholder="https://..." class="link-url">'
+        + '<input type="text" name="link_labels" placeholder="Label (optional)" class="link-label">'
+        + '<button type="button" class="outline secondary" onclick="this.parentElement.remove()" style="margin-bottom:0">&times;</button>';
+    container.appendChild(row);
+}
+</script>
+{% endblock %}
