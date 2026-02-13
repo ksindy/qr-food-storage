@@ -177,10 +177,60 @@ security = HTTPBasic()
 # Add as a dependency to protected routes
 ```
 
-## Deployment Notes
+## Deployment (Fly.io)
 
-- Set `BASE_URL` to your public domain
-- Generate a real `SECRET_KEY` (e.g., `python -c "import secrets; print(secrets.token_hex(32))"`)
-- For Postgres, change `DATABASE_URL` to `postgresql://user:pass@host/db` and install `psycopg2-binary`
-- For cloud photo storage, replace the functions in `app/photo.py` with S3/GCS equivalents
-- Run with gunicorn in production: `gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker`
+The app is deployed on Fly.io with SQLite on a persistent volume. The free tier is more than enough for a household app.
+
+### First-Time Setup
+
+```bash
+# 1. Install the Fly CLI: https://fly.io/docs/flyctl/install/
+# 2. Log in
+fly auth login
+
+# 3. Create the app (already configured in fly.toml)
+fly apps create qr-food-storage
+
+# 4. Create a persistent volume for the database + uploads
+fly volumes create data --region sjc --size 1
+
+# 5. Set secrets
+fly secrets set SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')" \
+               BASE_URL="https://qr-food-storage.fly.dev"
+
+# 6. Deploy
+fly deploy
+```
+
+The app will be live at **https://qr-food-storage.fly.dev**.
+
+### Subsequent Deploys
+
+```bash
+fly deploy
+```
+
+The persistent volume survives redeploys — your database and photos are safe.
+
+### Dev vs Production Workflow
+
+| | Local Dev | Production |
+|---|---|---|
+| **Branch** | `dev` | `main` |
+| **Run** | `python run.py` | `fly deploy` |
+| **Database** | `./food_storage.db` | `/data/food_storage.db` (volume) |
+| **Uploads** | `./uploads/` | `/data/uploads/` (volume) |
+| **URL** | `http://localhost:8000` | `https://qr-food-storage.fly.dev` |
+
+Workflow:
+1. Work on `dev` branch locally, test with `python run.py`
+2. When ready, merge to `main` and run `fly deploy`
+
+### Useful Fly.io Commands
+
+```bash
+fly status              # App status and VM info
+fly logs                # Stream production logs
+fly ssh console         # SSH into the running VM
+fly volumes list        # Check persistent volume
+```
