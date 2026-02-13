@@ -12,7 +12,7 @@
 <div class="revision-entry {% if rev.is_deleted %}deleted{% endif %}">
     <div class="rev-header">
         <strong>Revision #{{ rev.revision_num }}</strong>
-        &mdash; {{ rev.created_at.strftime('%Y-%m-%d %H:%M UTC') }}
+        &mdash; {{ rev.created_at.strftime('%b %d, %Y') }}
         {% if rev.is_deleted %}<span class="badge badge-deleted">Deleted</span>{% endif %}
     </div>
     <table>

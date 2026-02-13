@@ -32,9 +32,21 @@ body {
     font-weight: 600;
 }
 
-.badge-location {
-    background: var(--pico-primary-background);
-    color: var(--pico-primary-inverse);
+span.badge.badge-location {
+    background: #6c757d !important;
+    color: #fff !important;
+}
+
+span.badge.badge-location[data-location="pantry"] {
+    background: #e67e22 !important;
+}
+
+span.badge.badge-location[data-location="fridge"] {
+    background: #3498db !important;
+}
+
+span.badge.badge-location[data-location="freezer"] {
+    background: #9b59b6 !important;
 }
 
 .badge-expired {

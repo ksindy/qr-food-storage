@@ -30,7 +30,7 @@
                 <div style="flex:1">
                     <h3>{{ rev.name }}</h3>
                     <div class="item-meta">
-                        <span class="badge badge-location">{{ rev.storage_location.name }}</span>
+                        <span class="badge badge-location" data-location="{{ rev.storage_location.name|lower }}">{{ rev.storage_location.name }}</span>
                         {% if rev.is_deleted %}
                             <span class="badge badge-deleted">Deleted</span>
                         {% endif %}
