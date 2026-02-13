@@ -48,6 +48,7 @@ body {
     margin-bottom: 1.5rem;
     font-size: 0.95rem;
     color: var(--pico-color);
+    white-space: pre-line !important;
 }
 
 .badge {

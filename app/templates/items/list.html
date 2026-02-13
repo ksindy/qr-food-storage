@@ -42,7 +42,7 @@
                         {% endif %}
                     </div>
                     {% if rev.notes %}
-                    <p class="item-notes"><span class="note-icon"></span>{{ rev.notes }}</p>
+                    <p class="item-notes"><span class="note-icon"></span>{{ rev.notes.split('\n')[0] }}</p>
                     {% endif %}
                 </div>
             </div>
