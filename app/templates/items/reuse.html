@@ -41,6 +41,11 @@
     <small><a href="/locations">Manage locations</a></small>
 
     <label>
+        Notes (optional)
+        <textarea name="notes" rows="2" placeholder="e.g. half batch, extra spicy...">{{ form.notes if form is defined and form.notes else '' }}</textarea>
+    </label>
+
+    <label>
         Photo (optional)
         <input type="file" name="photo" accept="image/*">
     </label>

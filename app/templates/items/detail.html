@@ -40,6 +40,12 @@
     </tbody>
 </table>
 
+{% if rev.notes %}
+<div class="notes-callout">
+    <span class="note-icon"></span>{{ rev.notes }}
+</div>
+{% endif %}
+
 {% if rev.photo_filename %}
 <h4>Photo</h4>
 <img src="{{ photo_url(rev.photo_filename) }}" alt="Food photo" class="item-photo">

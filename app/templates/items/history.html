@@ -21,6 +21,9 @@
             <tr><th>Date prepared</th><td>{{ rev.date_prepared.strftime('%b %d, %Y') }}</td></tr>
             <tr><th>Expiration</th><td>{{ rev.expiration_date.strftime('%b %d, %Y') if rev.expiration_date else '—' }}</td></tr>
             <tr><th>Location</th><td>{{ rev.storage_location.name }}</td></tr>
+            {% if rev.notes %}
+            <tr><th>Notes</th><td>{{ rev.notes }}</td></tr>
+            {% endif %}
             {% if rev.photo_filename %}
             <tr><th>Photo</th><td><img src="{{ photo_url(rev.photo_filename) }}" alt="" class="photo-thumb"></td></tr>
             {% endif %}

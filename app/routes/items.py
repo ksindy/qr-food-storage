@@ -126,6 +126,7 @@ async def create_item(
     storage_location_id: int = Form(...),
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
+    notes: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -170,6 +171,7 @@ async def create_item(
                     "date_prepared": date_prepared,
                     "expiration_date": expiration_date,
                     "storage_location_id": storage_location_id,
+                    "notes": notes,
                 },
             },
         )
@@ -186,6 +188,7 @@ async def create_item(
         expiration_date=exp,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
+        notes=notes.strip() or None,
     )
     db.add(revision)
     db.flush()
@@ -275,6 +278,7 @@ async def save_edit(
     storage_location_id: int = Form(...),
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
+    notes: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     keep_photo: bool = Form(False),
     db: Session = Depends(get_db),
@@ -332,6 +336,7 @@ async def save_edit(
         expiration_date=exp,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
+        notes=notes.strip() or None,
     )
     db.add(revision)
     db.flush()
@@ -358,6 +363,7 @@ def soft_delete(public_id: str, db: Session = Depends(get_db)):
         expiration_date=prev.expiration_date if prev else None,
         storage_location_id=prev.storage_location_id if prev else 1,
         photo_filename=prev.photo_filename if prev else None,
+        notes=prev.notes if prev else None,
         is_deleted=True,
     )
     db.add(revision)
@@ -383,6 +389,7 @@ def restore_item(public_id: str, db: Session = Depends(get_db)):
         expiration_date=source.expiration_date,
         storage_location_id=source.storage_location_id,
         photo_filename=source.photo_filename,
+        notes=source.notes,
         is_deleted=False,
     )
     db.add(revision)
@@ -432,6 +439,7 @@ async def reuse_label(
     storage_location_id: int = Form(...),
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
+    notes: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -480,6 +488,7 @@ async def reuse_label(
                     "date_prepared": date_prepared,
                     "expiration_date": expiration_date,
                     "storage_location_id": storage_location_id,
+                    "notes": notes,
                 },
             },
         )
@@ -493,6 +502,7 @@ async def reuse_label(
         expiration_date=exp,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
+        notes=notes.strip() or None,
         is_deleted=False,
     )
     db.add(revision)

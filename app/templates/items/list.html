@@ -37,11 +37,13 @@
                         {% if rev.expiration_date and rev.expiration_date < today and not rev.is_deleted %}
                             <span class="badge badge-expired">Expired</span>
                         {% endif %}
-                        &nbsp; Prepared: {{ rev.date_prepared.strftime('%b %d, %Y') }}
                         {% if rev.expiration_date %}
-                         &middot; Expires: {{ rev.expiration_date.strftime('%b %d, %Y') }}
+                         &nbsp; Expires: {{ rev.expiration_date.strftime('%b %d, %Y') }}
                         {% endif %}
                     </div>
+                    {% if rev.notes %}
+                    <p class="item-notes"><span class="note-icon"></span>{{ rev.notes }}</p>
+                    {% endif %}
                 </div>
             </div>
         </article>
