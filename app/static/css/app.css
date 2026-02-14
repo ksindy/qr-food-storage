@@ -90,6 +90,7 @@ body {
 /* Product cards */
 .product-card {
     flex: 0 0 148px;
+    max-width: 148px;
     scroll-snap-align: start;
     border: 1px solid var(--pico-muted-border-color);
     border-radius: 12px;
@@ -114,7 +115,8 @@ body {
 }
 
 .product-card-photo {
-    width: 100%;
+    width: 148px;
+    max-width: 100%;
     height: 120px;
     object-fit: cover;
     display: block;
