@@ -39,6 +39,22 @@
         </select>
     </label>
 
+    <div class="grid">
+        <label>
+            Amount (optional)
+            <input type="number" name="amount" step="any" min="0" placeholder="e.g. 2, 1.5" value="{{ rev.amount if rev.amount is not none else '' }}">
+        </label>
+        <label>
+            Unit
+            <select name="amount_unit">
+                <option value="">--</option>
+                {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                <option value="{{ u }}" {% if rev.amount_unit == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+
     <label>
         Notes (optional)
         <textarea name="notes" rows="2" placeholder="e.g. half batch, extra spicy...">{{ rev.notes or '' }}</textarea>

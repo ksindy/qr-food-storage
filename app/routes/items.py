@@ -139,6 +139,8 @@ async def create_item(
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
     notes: str = Form(""),
+    amount: Optional[float] = Form(None),
+    amount_unit: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -184,6 +186,8 @@ async def create_item(
                     "expiration_date": expiration_date,
                     "storage_location_id": storage_location_id,
                     "notes": notes,
+                    "amount": amount,
+                    "amount_unit": amount_unit,
                 },
             },
         )
@@ -201,6 +205,8 @@ async def create_item(
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
+        amount=amount,
+        amount_unit=amount_unit.strip() or None,
     )
     db.add(revision)
     db.flush()
@@ -291,6 +297,8 @@ async def save_edit(
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
     notes: str = Form(""),
+    amount: Optional[float] = Form(None),
+    amount_unit: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     keep_photo: bool = Form(False),
     db: Session = Depends(get_db),
@@ -349,6 +357,8 @@ async def save_edit(
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
+        amount=amount,
+        amount_unit=amount_unit.strip() or None,
     )
     db.add(revision)
     db.flush()
@@ -358,6 +368,45 @@ async def save_edit(
 
     db.commit()
     return RedirectResponse(f"/i/{public_id}", status_code=303)
+
+
+# --- Quick update amount ---
+
+@router.post("/i/{public_id}/amount")
+def update_amount(
+    public_id: str,
+    amount: Optional[float] = Form(None),
+    amount_unit: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    item = _get_item_or_404(public_id, db)
+    prev = item.latest_revision
+
+    revision = ItemRevision(
+        item_id=item.id,
+        revision_num=(prev.revision_num + 1) if prev else 1,
+        name=prev.name if prev else "Unknown",
+        date_prepared=prev.date_prepared if prev else date.today(),
+        expiration_date=prev.expiration_date if prev else None,
+        storage_location_id=prev.storage_location_id if prev else 1,
+        photo_filename=prev.photo_filename if prev else None,
+        notes=prev.notes if prev else None,
+        amount=amount,
+        amount_unit=amount_unit.strip() or None,
+        is_deleted=prev.is_deleted if prev else False,
+    )
+    db.add(revision)
+    db.flush()
+
+    # Copy links from previous revision
+    if prev:
+        for link in prev.links:
+            db.add(RevisionLink(
+                revision_id=revision.id, url=link.url, label=link.label
+            ))
+
+    db.commit()
+    return RedirectResponse("/", status_code=303)
 
 
 # --- Delete ---
@@ -376,6 +425,8 @@ def soft_delete(public_id: str, db: Session = Depends(get_db)):
         storage_location_id=prev.storage_location_id if prev else 1,
         photo_filename=prev.photo_filename if prev else None,
         notes=prev.notes if prev else None,
+        amount=prev.amount if prev else None,
+        amount_unit=prev.amount_unit if prev else None,
         is_deleted=True,
     )
     db.add(revision)
@@ -402,6 +453,8 @@ def restore_item(public_id: str, db: Session = Depends(get_db)):
         storage_location_id=source.storage_location_id,
         photo_filename=source.photo_filename,
         notes=source.notes,
+        amount=source.amount,
+        amount_unit=source.amount_unit,
         is_deleted=False,
     )
     db.add(revision)
@@ -452,6 +505,8 @@ async def reuse_label(
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
     notes: str = Form(""),
+    amount: Optional[float] = Form(None),
+    amount_unit: str = Form(""),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -501,6 +556,8 @@ async def reuse_label(
                     "expiration_date": expiration_date,
                     "storage_location_id": storage_location_id,
                     "notes": notes,
+                    "amount": amount,
+                    "amount_unit": amount_unit,
                 },
             },
         )
@@ -515,6 +572,8 @@ async def reuse_label(
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
+        amount=amount,
+        amount_unit=amount_unit.strip() or None,
         is_deleted=False,
     )
     db.add(revision)

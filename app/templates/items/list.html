@@ -44,6 +44,9 @@
                     {% endif %}
                     <div class="product-card-body">
                         <p class="product-card-name">{{ rev.name }}</p>
+                        {% if rev.amount %}
+                        <p class="product-card-amount">{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}</p>
+                        {% endif %}
                         {% if rev.expiration_date %}
                         <p class="product-card-meta">
                             {% if rev.expiration_date < today and not rev.is_deleted %}
@@ -58,6 +61,23 @@
                         {% endif %}
                     </div>
                 </a>
+                {% if not rev.is_deleted %}
+                <div class="card-amount-edit">
+                    <button type="button" class="amount-edit-btn" onclick="event.stopPropagation(); toggleAmountEdit(this)">
+                        {% if rev.amount %}{{ rev.amount }} {{ rev.amount_unit or '' }}{% else %}+ Amt{% endif %}
+                    </button>
+                    <form class="amount-edit-form" method="post" action="/i/{{ rev.item.public_id }}/amount" onclick="event.stopPropagation()">
+                        <input type="number" name="amount" step="any" min="0" placeholder="0" value="{{ rev.amount if rev.amount is not none else '' }}">
+                        <select name="amount_unit">
+                            <option value="">--</option>
+                            {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                            <option value="{{ u }}" {% if rev.amount_unit == u %}selected{% endif %}>{{ u }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="amount-save-btn">OK</button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         {% else %}
@@ -86,10 +106,20 @@ function toggleMenu(btn) {
     });
     menu.classList.toggle('open');
 }
-document.addEventListener('click', function() {
-    document.querySelectorAll('.card-menu.open').forEach(function(m) {
-        m.classList.remove('open');
+function toggleAmountEdit(btn) {
+    var form = btn.nextElementSibling;
+    document.querySelectorAll('.amount-edit-form.open').forEach(function(f) {
+        if (f !== form) f.classList.remove('open');
     });
+    form.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.card-menu') && !e.target.closest('.card-menu-btn')) {
+        document.querySelectorAll('.card-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    }
+    if (!e.target.closest('.card-amount-edit')) {
+        document.querySelectorAll('.amount-edit-form.open').forEach(function(f) { f.classList.remove('open'); });
+    }
 });
 </script>
 {% endblock %}

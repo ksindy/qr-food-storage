@@ -156,6 +156,13 @@ body {
     margin: 0;
 }
 
+.product-card-amount {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pico-primary);
+    margin: 0 0 0.1rem;
+}
+
 .product-card-notes {
     font-size: 0.72rem;
     font-style: italic;
@@ -164,6 +171,78 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     margin: 0.15rem 0 0;
+}
+
+/* Inline amount edit at bottom of card */
+.card-amount-edit {
+    border-top: 1px solid var(--pico-muted-border-color);
+    padding: 0.35rem 0.5rem;
+    position: relative;
+}
+
+.amount-edit-btn {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pico-primary) !important;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+}
+
+.amount-edit-btn:hover {
+    text-decoration: underline;
+}
+
+.amount-edit-form {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: 8px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+    padding: 0.5rem;
+    z-index: 10;
+}
+
+.amount-edit-form.open {
+    display: flex;
+    gap: 0.3rem;
+    align-items: end;
+}
+
+.amount-edit-form input[type="number"] {
+    width: 60px;
+    padding: 0.3rem 0.4rem !important;
+    margin: 0 !important;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+.amount-edit-form select {
+    width: 65px;
+    padding: 0.3rem 0.2rem !important;
+    margin: 0 !important;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+.amount-save-btn {
+    padding: 0.3rem 0.5rem !important;
+    margin: 0 !important;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    background: var(--pico-primary) !important;
+    color: #fff !important;
+    border: none !important;
+    cursor: pointer;
+    white-space: nowrap;
 }
 
 /* "..." menu button */

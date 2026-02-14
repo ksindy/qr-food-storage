@@ -37,6 +37,9 @@
         <tr><th>Date prepared</th><td>{{ rev.date_prepared.strftime('%B %d, %Y') }}</td></tr>
         <tr><th>Expiration date</th><td>{{ rev.expiration_date.strftime('%B %d, %Y') if rev.expiration_date else '—' }}</td></tr>
         <tr><th>Storage location</th><td>{{ rev.storage_location.name }}</td></tr>
+        {% if rev.amount %}
+        <tr><th>Amount</th><td>{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}</td></tr>
+        {% endif %}
     </tbody>
 </table>
 

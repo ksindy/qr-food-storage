@@ -11,9 +11,10 @@ db_path = '/data/food_storage.db'
 if os.path.exists(db_path):
     conn = sqlite3.connect(db_path)
     cols = [r[1] for r in conn.execute('PRAGMA table_info(item_revisions)')]
-    if 'notes' not in cols:
-        conn.execute('ALTER TABLE item_revisions ADD COLUMN notes TEXT')
-        conn.commit()
+    for col, typ in [('notes', 'TEXT'), ('amount', 'REAL'), ('amount_unit', 'TEXT')]:
+        if col not in cols:
+            conn.execute(f'ALTER TABLE item_revisions ADD COLUMN {col} {typ}')
+    conn.commit()
     conn.close()
 "
 

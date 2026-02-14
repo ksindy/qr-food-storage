@@ -4,7 +4,7 @@ import secrets
 from datetime import date, datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -62,6 +62,8 @@ class ItemRevision(Base):
     )
     photo_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    amount_unit: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
