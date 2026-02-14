@@ -86,14 +86,26 @@ def item_list(
 
     revisions = query.order_by(ItemRevision.expiration_date.asc()).all()
 
+    # Group revisions by location for carousel layout
+    loc_items = {loc.id: [] for loc in locations}
+    for rev in revisions:
+        if rev.storage_location_id in loc_items:
+            loc_items[rev.storage_location_id].append(rev)
+
+    sections = []
+    for loc in locations:
+        items = loc_items.get(loc.id, [])
+        # Show empty sections only when not searching
+        if items or not q:
+            sections.append({"location": loc, "revisions": items})
+
     return templates.TemplateResponse(
         "items/list.html",
         {
             "request": request,
-            "revisions": revisions,
+            "sections": sections,
             "locations": locations,
             "q": q,
-            "selected_location": location,
             "show_deleted": show_deleted,
             "today": date.today(),
             "photo_url": photo_url,

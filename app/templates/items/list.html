@@ -1,55 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Items - QR Food Storage{% endblock %}
+{% block title %}QR Food Storage{% endblock %}
 
 {% block content %}
-<h2>Food Items</h2>
-
-<form class="filters" method="get" action="/">
-    <input type="search" name="q" value="{{ q }}" placeholder="Search by name..." style="max-width:250px">
-    <select name="location" style="max-width:180px">
-        <option value="">All locations</option>
-        {% for loc in locations %}
-        <option value="{{ loc.id }}" {% if selected_location == loc.id %}selected{% endif %}>{{ loc.name }}</option>
-        {% endfor %}
-    </select>
-    <label style="display:flex;align-items:center;gap:0.3rem;margin-bottom:0;white-space:nowrap">
-        <input type="checkbox" name="show_deleted" value="true" {% if show_deleted %}checked{% endif %} role="switch" style="margin-bottom:0">
-        Show deleted
-    </label>
-    <button type="submit" class="outline" style="margin-bottom:0">Filter</button>
+<form class="search-bar" method="get" action="/">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search items...">
+    {% if show_deleted %}
+    <input type="hidden" name="show_deleted" value="true">
+    {% endif %}
 </form>
 
-{% if revisions %}
-    {% for rev in revisions %}
-    <a href="/i/{{ rev.item.public_id }}" style="text-decoration:none;color:inherit">
-        <article class="item-card {% if rev.is_deleted %}deleted{% endif %}">
-            <div style="display:flex;gap:1rem;align-items:start">
-                {% if rev.photo_filename %}
-                <img src="{{ photo_url(rev.photo_filename) }}" alt="" class="photo-thumb">
-                {% endif %}
-                <div style="flex:1">
-                    <h3>{{ rev.name }}</h3>
-                    <div class="item-meta">
-                        <span class="badge badge-location" data-location="{{ rev.storage_location.name|lower }}">{{ rev.storage_location.name }}</span>
-                        {% if rev.is_deleted %}
-                            <span class="badge badge-deleted">Deleted</span>
-                        {% endif %}
-                        {% if rev.expiration_date and rev.expiration_date < today and not rev.is_deleted %}
-                            <span class="badge badge-expired">Expired</span>
-                        {% endif %}
+<div class="search-options">
+    <a href="/?show_deleted={{ 'false' if show_deleted else 'true' }}{% if q %}&q={{ q }}{% endif %}" class="toggle-deleted">
+        {{ "Hide" if show_deleted else "Show" }} deleted
+    </a>
+</div>
+
+{% for section in sections %}
+<div class="location-section">
+    <div class="section-header">
+        <span class="section-dot" data-location="{{ section.location.name|lower }}"></span>
+        <h3>{{ section.location.name }}</h3>
+        <span class="section-count">{{ section.revisions|length }}</span>
+    </div>
+    <div class="carousel">
+        {% if section.revisions %}
+            {% for rev in section.revisions %}
+            <div class="product-card {% if rev.is_deleted %}deleted{% endif %}">
+                <button class="card-menu-btn" onclick="event.preventDefault(); event.stopPropagation(); toggleMenu(this)" type="button">&hellip;</button>
+                <div class="card-menu">
+                    <a href="/i/{{ rev.item.public_id }}">View details</a>
+                    <a href="/i/{{ rev.item.public_id }}/edit">Edit</a>
+                    <form method="post" action="/i/{{ rev.item.public_id }}/delete" onsubmit="event.stopPropagation(); return confirm('Delete this item?')">
+                        <button type="submit" class="menu-delete">Delete</button>
+                    </form>
+                </div>
+                <a href="/i/{{ rev.item.public_id }}" class="card-link">
+                    {% if rev.photo_filename %}
+                    <img src="{{ photo_url(rev.photo_filename) }}" alt="" class="product-card-photo">
+                    {% else %}
+                    <div class="product-card-placeholder">
+                        <span>{{ rev.name[0]|upper }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="product-card-body">
+                        <p class="product-card-name">{{ rev.name }}</p>
                         {% if rev.expiration_date %}
-                         &nbsp; Expires: {{ rev.expiration_date.strftime('%b %d, %Y') }}
+                        <p class="product-card-meta">
+                            {% if rev.expiration_date < today and not rev.is_deleted %}
+                            <span class="badge badge-expired">Expired</span>
+                            {% else %}
+                            Exp: {{ rev.expiration_date.strftime('%b %d') }}
+                            {% endif %}
+                        </p>
+                        {% endif %}
+                        {% if rev.notes %}
+                        <p class="product-card-notes">{{ rev.notes.split('\n')[0] }}</p>
                         {% endif %}
                     </div>
-                    {% if rev.notes %}
-                    <p class="item-notes"><span class="note-icon"></span>{{ rev.notes.split('\n')[0] }}</p>
-                    {% endif %}
-                </div>
+                </a>
             </div>
-        </article>
-    </a>
-    {% endfor %}
-{% else %}
-    <p>No items found. <a href="/items/new">Create one</a>.</p>
+            {% endfor %}
+        {% else %}
+            <a href="/items/new" class="empty-card">
+                <span class="empty-card-plus">+</span>
+                <span>Add item</span>
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% if not sections %}
+<p style="text-align:center;color:var(--pico-muted-color);margin-top:3rem">
+    No items found. <a href="/items/new">Create one</a>.
+</p>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMenu(btn) {
+    var menu = btn.nextElementSibling;
+    document.querySelectorAll('.card-menu.open').forEach(function(m) {
+        if (m !== menu) m.classList.remove('open');
+    });
+    menu.classList.toggle('open');
+}
+document.addEventListener('click', function() {
+    document.querySelectorAll('.card-menu.open').forEach(function(m) {
+        m.classList.remove('open');
+    });
+});
+</script>
 {% endblock %}
