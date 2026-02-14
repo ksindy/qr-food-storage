@@ -62,20 +62,25 @@
                     </div>
                 </a>
                 {% if not rev.is_deleted %}
-                <div class="card-amount-edit">
-                    <button type="button" class="amount-edit-btn" onclick="event.stopPropagation(); toggleAmountEdit(this)">
-                        {% if rev.amount %}{{ rev.amount }} {{ rev.amount_unit or '' }}{% else %}+ Amt{% endif %}
+                <div style="position:relative">
+                    <button type="button" class="amount-edit-btn" onclick="event.preventDefault(); event.stopPropagation(); toggleAmountEdit(this)">
+                        {% if rev.amount %}{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}{% else %}+ Qty{% endif %}
                     </button>
-                    <form class="amount-edit-form" method="post" action="/i/{{ rev.item.public_id }}/amount" onclick="event.stopPropagation()">
-                        <input type="number" name="amount" step="any" min="0" placeholder="0" value="{{ rev.amount if rev.amount is not none else '' }}">
-                        <select name="amount_unit">
-                            <option value="">--</option>
-                            {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
-                            <option value="{{ u }}" {% if rev.amount_unit == u %}selected{% endif %}>{{ u }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="amount-save-btn">OK</button>
-                    </form>
+                    <div class="amount-popup">
+                        <div class="amount-popup-label">Update Amount</div>
+                        <form class="amount-popup-form" method="post" action="/i/{{ rev.item.public_id }}/amount" onclick="event.stopPropagation()">
+                            <div class="amount-popup-row">
+                                <input type="number" name="amount" step="any" min="0" placeholder="0" value="{{ rev.amount if rev.amount is not none else '' }}">
+                                <select name="amount_unit">
+                                    <option value="">--</option>
+                                    {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                                    <option value="{{ u }}" {% if rev.amount_unit == u %}selected{% endif %}>{{ u }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="amount-save-btn">Save</button>
+                        </form>
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -104,21 +109,23 @@ function toggleMenu(btn) {
     document.querySelectorAll('.card-menu.open').forEach(function(m) {
         if (m !== menu) m.classList.remove('open');
     });
+    document.querySelectorAll('.amount-popup.open').forEach(function(p) { p.classList.remove('open'); });
     menu.classList.toggle('open');
 }
 function toggleAmountEdit(btn) {
-    var form = btn.nextElementSibling;
-    document.querySelectorAll('.amount-edit-form.open').forEach(function(f) {
-        if (f !== form) f.classList.remove('open');
+    var popup = btn.nextElementSibling;
+    document.querySelectorAll('.amount-popup.open').forEach(function(p) {
+        if (p !== popup) p.classList.remove('open');
     });
-    form.classList.toggle('open');
+    document.querySelectorAll('.card-menu.open').forEach(function(m) { m.classList.remove('open'); });
+    popup.classList.toggle('open');
 }
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.card-menu') && !e.target.closest('.card-menu-btn')) {
         document.querySelectorAll('.card-menu.open').forEach(function(m) { m.classList.remove('open'); });
     }
-    if (!e.target.closest('.card-amount-edit')) {
-        document.querySelectorAll('.amount-edit-form.open').forEach(function(f) { f.classList.remove('open'); });
+    if (!e.target.closest('.amount-popup') && !e.target.closest('.amount-edit-btn')) {
+        document.querySelectorAll('.amount-popup.open').forEach(function(p) { p.classList.remove('open'); });
     }
 });
 </script>
