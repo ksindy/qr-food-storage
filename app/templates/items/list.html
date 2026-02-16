@@ -21,9 +21,9 @@
         <span class="section-dot" data-location="{{ section.location.name|lower }}"></span>
         <h3>{{ section.location.name }}</h3>
         <span class="section-count">{{ section.revisions|length }}</span>
+        <a href="/items/new?location={{ section.location.id }}" class="section-add-btn" title="Add item to {{ section.location.name }}">+</a>
     </div>
     <div class="carousel">
-        {% if section.revisions %}
             {% for rev in section.revisions %}
             <div class="product-card {% if rev.is_deleted %}deleted{% endif %}">
                 <button class="card-menu-btn" onclick="event.preventDefault(); event.stopPropagation(); toggleMenu(this)" type="button">&hellip;</button>
@@ -85,12 +85,6 @@
                 {% endif %}
             </div>
             {% endfor %}
-        {% else %}
-            <a href="/items/new" class="empty-card">
-                <span class="empty-card-plus">+</span>
-                <span>Add item</span>
-            </a>
-        {% endif %}
     </div>
 </div>
 {% endfor %}

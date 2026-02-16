@@ -95,8 +95,7 @@ def item_list(
     sections = []
     for loc in locations:
         items = loc_items.get(loc.id, [])
-        # Show empty sections only when not searching
-        if items or not q:
+        if items:
             sections.append({"location": loc, "revisions": items})
 
     return templates.TemplateResponse(
@@ -116,7 +115,11 @@ def item_list(
 # --- Create item ---
 
 @router.get("/items/new", response_class=HTMLResponse)
-def create_form(request: Request, db: Session = Depends(get_db)):
+def create_form(
+    request: Request,
+    location: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
     locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
     return templates.TemplateResponse(
         "items/create.html",
@@ -125,6 +128,7 @@ def create_form(request: Request, db: Session = Depends(get_db)):
             "locations": locations,
             "today": date.today(),
             "default_exp": date.today() + timedelta(days=7),
+            "preselect_location": location,
         },
     )
 

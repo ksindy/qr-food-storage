@@ -72,6 +72,28 @@ body {
     font-weight: 400;
 }
 
+.section-add-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--pico-muted-border-color);
+    color: var(--pico-muted-color) !important;
+    text-decoration: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 300;
+    line-height: 1;
+    margin-left: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.section-add-btn:hover {
+    background: var(--pico-primary);
+    color: #fff !important;
+}
+
 /* Horizontal carousel */
 .carousel {
     display: flex;

@@ -33,7 +33,7 @@
         Storage location *
         <select name="storage_location_id" required>
             {% for loc in locations %}
-            <option value="{{ loc.id }}" {% if form is defined and form.storage_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+            <option value="{{ loc.id }}" {% if form is defined and form.storage_location_id == loc.id %}selected{% elif preselect_location is defined and preselect_location == loc.id %}selected{% endif %}>{{ loc.name }}</option>
             {% endfor %}
         </select>
     </label>
