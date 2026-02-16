@@ -114,16 +114,27 @@ def item_list(
             tag_revs.sort(key=lambda r: r.expiration_date or date.max)
             tag_sections.append({"tag": tag, "revisions": tag_revs})
 
+    # Build "Expiring Soon" section (within 3 days, not already expired)
+    today_ = date.today()
+    soon = today_ + timedelta(days=3)
+    expiring_soon = [
+        rev for rev in revisions
+        if rev.expiration_date
+        and not rev.is_deleted
+        and today_ <= rev.expiration_date <= soon
+    ]
+
     return templates.TemplateResponse(
         "items/list.html",
         {
             "request": request,
             "sections": sections,
             "tag_sections": tag_sections,
+            "expiring_soon": expiring_soon,
             "locations": locations,
             "q": q,
             "show_deleted": show_deleted,
-            "today": date.today(),
+            "today": today_,
             "photo_url": photo_url,
         },
     )

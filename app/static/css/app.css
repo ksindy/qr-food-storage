@@ -521,6 +521,10 @@ span.badge.badge-location[data-location="freezer"] {
     color: #fff;
 }
 
+.expiring-dot {
+    background: #e74c3c !important;
+}
+
 /* ================================================================
    PRINTABLE LABEL (label.html uses inline styles mostly)
    ================================================================ */
