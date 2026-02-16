@@ -7,6 +7,7 @@ DEFAULT_LOCATIONS = ["Pantry", "Fridge", "Freezer"]
 
 DEFAULT_TAGS = [
     {"name": "Prepared Meals", "is_default": True},
+    {"name": "Snacks", "is_default": True},
 ]
 
 

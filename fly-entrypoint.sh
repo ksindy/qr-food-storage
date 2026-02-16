@@ -40,10 +40,11 @@ if os.path.exists(db_path):
             UNIQUE (item_id, tag_id)
         )
     ''')
-    # Seed default tag
-    cur = conn.execute(\"SELECT id FROM tags WHERE name = 'Prepared Meals'\")
-    if not cur.fetchone():
-        conn.execute(\"INSERT INTO tags (name, is_default) VALUES ('Prepared Meals', 1)\")
+    # Seed default tags
+    for tag_name in ['Prepared Meals', 'Snacks']:
+        cur = conn.execute('SELECT id FROM tags WHERE name = ?', (tag_name,))
+        if not cur.fetchone():
+            conn.execute('INSERT INTO tags (name, is_default) VALUES (?, 1)', (tag_name,))
     conn.commit()
     conn.close()
 "
