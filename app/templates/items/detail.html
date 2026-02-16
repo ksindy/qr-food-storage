@@ -23,6 +23,9 @@
             {% if rev.expiration_date and rev.expiration_date < today and not is_deleted %}
                 <span class="badge badge-expired">Expired</span>
             {% endif %}
+            {% for tag in item.tags %}
+                <span class="badge badge-tag">{{ tag.name }}</span>
+            {% endfor %}
         </div>
     </div>
     <div style="text-align:center">

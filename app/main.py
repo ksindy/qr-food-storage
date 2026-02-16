@@ -4,7 +4,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import BASE_DIR, SECRET_KEY, UPLOAD_DIR
 from app.database import Base, engine, SessionLocal
-from app.seed import seed_locations
+from app.seed import seed_locations, seed_tags
 
 app = FastAPI(title="QR Food Storage")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -19,6 +19,7 @@ def on_startup():
     db = SessionLocal()
     try:
         seed_locations(db)
+        seed_tags(db)
     finally:
         db.close()
 

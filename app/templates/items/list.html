@@ -15,6 +15,80 @@
     </a>
 </div>
 
+{% for tsection in tag_sections %}
+<div class="location-section tag-section">
+    <div class="section-header">
+        <span class="section-dot tag-dot"></span>
+        <h3>{{ tsection.tag.name }}</h3>
+        <span class="section-count">{{ tsection.revisions|length }}</span>
+        <a href="/items/new" class="section-add-btn" title="Add item">+</a>
+    </div>
+    <div class="carousel">
+            {% for rev in tsection.revisions %}
+            <div class="product-card {% if rev.is_deleted %}deleted{% endif %}">
+                <button class="card-menu-btn" onclick="event.preventDefault(); event.stopPropagation(); toggleMenu(this)" type="button">&hellip;</button>
+                <div class="card-menu">
+                    <a href="/i/{{ rev.item.public_id }}">View details</a>
+                    <a href="/i/{{ rev.item.public_id }}/edit">Edit</a>
+                    <form method="post" action="/i/{{ rev.item.public_id }}/delete" onsubmit="event.stopPropagation(); return confirm('Delete this item?')">
+                        <button type="submit" class="menu-delete">Delete</button>
+                    </form>
+                </div>
+                <a href="/i/{{ rev.item.public_id }}" class="card-link">
+                    {% if rev.photo_filename %}
+                    <img src="{{ photo_url(rev.photo_filename) }}" alt="" class="product-card-photo">
+                    {% else %}
+                    <div class="product-card-placeholder">
+                        <span>{{ rev.name[0]|upper }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="product-card-body">
+                        <p class="product-card-name">{{ rev.name }}</p>
+                        {% if rev.amount %}
+                        <p class="product-card-amount">{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}</p>
+                        {% endif %}
+                        {% if rev.expiration_date %}
+                        <p class="product-card-meta">
+                            {% if rev.expiration_date < today and not rev.is_deleted %}
+                            <span class="badge badge-expired">Expired</span>
+                            {% else %}
+                            Exp: {{ rev.expiration_date.strftime('%b %d') }}
+                            {% endif %}
+                        </p>
+                        {% endif %}
+                        {% if rev.notes %}
+                        <p class="product-card-notes">{{ rev.notes.split('\n')[0] }}</p>
+                        {% endif %}
+                    </div>
+                </a>
+                {% if not rev.is_deleted %}
+                <div style="position:relative">
+                    <button type="button" class="amount-edit-btn" onclick="event.preventDefault(); event.stopPropagation(); toggleAmountEdit(this)">
+                        {% if rev.amount %}{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}{% else %}+ Qty{% endif %}
+                    </button>
+                    <div class="amount-popup">
+                        <div class="amount-popup-label">Update Amount</div>
+                        <form class="amount-popup-form" method="post" action="/i/{{ rev.item.public_id }}/amount" onclick="event.stopPropagation()">
+                            <div class="amount-popup-row">
+                                <input type="number" name="amount" step="any" min="0" placeholder="0" value="{{ rev.amount if rev.amount is not none else '' }}">
+                                <select name="amount_unit">
+                                    <option value="">--</option>
+                                    {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                                    <option value="{{ u }}" {% if rev.amount_unit == u %}selected{% endif %}>{{ u }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="amount-save-btn">Save</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
 {% for section in sections %}
 <div class="location-section">
     <div class="section-header">

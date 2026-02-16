@@ -60,6 +60,18 @@
         <textarea name="notes" rows="2" placeholder="e.g. half batch, extra spicy...">{{ form.notes if form is defined and form.notes else '' }}</textarea>
     </label>
 
+    {% if all_tags %}
+    <fieldset>
+        <legend>Tags (optional)</legend>
+        {% for tag in all_tags %}
+        <label>
+            <input type="checkbox" name="tag_ids" value="{{ tag.id }}" {% if form is defined and form.tag_ids is defined and tag.id in form.tag_ids %}checked{% endif %}>
+            {{ tag.name }}
+        </label>
+        {% endfor %}
+    </fieldset>
+    {% endif %}
+
     <label>
         Photo (optional)
         <input type="file" name="photo" accept="image/*">

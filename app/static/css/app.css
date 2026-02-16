@@ -509,5 +509,18 @@ span.badge.badge-location[data-location="freezer"] {
 }
 
 /* ================================================================
+   TAGS
+   ================================================================ */
+
+.tag-dot {
+    background: #27ae60 !important;
+}
+
+.badge-tag {
+    background: #27ae60;
+    color: #fff;
+}
+
+/* ================================================================
    PRINTABLE LABEL (label.html uses inline styles mostly)
    ================================================================ */

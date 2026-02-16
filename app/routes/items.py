@@ -8,7 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import FoodItem, ItemRevision, RevisionLink, StorageLocation
+from app.models import FoodItem, ItemRevision, RevisionLink, StorageLocation, Tag
 from app.photo import photo_url, save_photo
 from app.qr import generate_qr_png, item_url
 from app.templating import templates
@@ -28,6 +28,7 @@ def _get_item_or_404(public_id: str, db: Session) -> FoodItem:
             .joinedload(ItemRevision.links),
             joinedload(FoodItem.revisions)
             .joinedload(ItemRevision.storage_location),
+            joinedload(FoodItem.tags),
         )
         .filter(FoodItem.public_id == public_id)
         .first()
@@ -98,11 +99,27 @@ def item_list(
         if items:
             sections.append({"location": loc, "revisions": items})
 
+    # Build tag sections for default tags
+    default_tags = db.query(Tag).filter(Tag.is_default == True).order_by(Tag.name).all()  # noqa: E712
+    tag_sections = []
+    # Build a lookup of item_id -> latest revision from our query results
+    rev_by_item = {rev.item_id: rev for rev in revisions}
+    for tag in default_tags:
+        # Get items with this tag that have a latest revision in our results
+        tag_revs = []
+        for item in tag.items:
+            if item.id in rev_by_item:
+                tag_revs.append(rev_by_item[item.id])
+        if tag_revs:
+            tag_revs.sort(key=lambda r: r.expiration_date or date.max)
+            tag_sections.append({"tag": tag, "revisions": tag_revs})
+
     return templates.TemplateResponse(
         "items/list.html",
         {
             "request": request,
             "sections": sections,
+            "tag_sections": tag_sections,
             "locations": locations,
             "q": q,
             "show_deleted": show_deleted,
@@ -121,11 +138,13 @@ def create_form(
     db: Session = Depends(get_db),
 ):
     locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+    all_tags = db.query(Tag).order_by(Tag.name).all()
     return templates.TemplateResponse(
         "items/create.html",
         {
             "request": request,
             "locations": locations,
+            "all_tags": all_tags,
             "today": date.today(),
             "default_exp": date.today() + timedelta(days=7),
             "preselect_location": location,
@@ -145,6 +164,7 @@ async def create_item(
     notes: str = Form(""),
     amount: Optional[float] = Form(None),
     amount_unit: str = Form(""),
+    tag_ids: List[int] = Form(default=[]),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
 ):
@@ -176,11 +196,13 @@ async def create_item(
 
     if errors:
         locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+        all_tags = db.query(Tag).order_by(Tag.name).all()
         return templates.TemplateResponse(
             "items/create.html",
             {
                 "request": request,
                 "locations": locations,
+                "all_tags": all_tags,
                 "today": date.today(),
                 "default_exp": exp,
                 "errors": errors,
@@ -192,6 +214,7 @@ async def create_item(
                     "notes": notes,
                     "amount": amount,
                     "amount_unit": amount_unit,
+                    "tag_ids": tag_ids,
                 },
             },
         )
@@ -199,6 +222,11 @@ async def create_item(
     item = FoodItem()
     db.add(item)
     db.flush()  # get item.id
+
+    # Associate tags
+    if tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+        item.tags = tags
 
     revision = ItemRevision(
         item_id=item.id,
@@ -277,6 +305,8 @@ def edit_form(public_id: str, request: Request, db: Session = Depends(get_db)):
     item = _get_item_or_404(public_id, db)
     rev = item.latest_active_revision or item.latest_revision
     locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+    all_tags = db.query(Tag).order_by(Tag.name).all()
+    item_tag_ids = {t.id for t in item.tags}
 
     return templates.TemplateResponse(
         "items/edit.html",
@@ -285,6 +315,8 @@ def edit_form(public_id: str, request: Request, db: Session = Depends(get_db)):
             "item": item,
             "rev": rev,
             "locations": locations,
+            "all_tags": all_tags,
+            "item_tag_ids": item_tag_ids,
             "photo_url": photo_url,
         },
     )
@@ -303,6 +335,7 @@ async def save_edit(
     notes: str = Form(""),
     amount: Optional[float] = Form(None),
     amount_unit: str = Form(""),
+    tag_ids: List[int] = Form(default=[]),
     photo: Optional[UploadFile] = File(None),
     keep_photo: bool = Form(False),
     db: Session = Depends(get_db),
@@ -339,6 +372,7 @@ async def save_edit(
 
     if errors:
         locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+        all_tags = db.query(Tag).order_by(Tag.name).all()
         return templates.TemplateResponse(
             "items/edit.html",
             {
@@ -346,10 +380,18 @@ async def save_edit(
                 "item": item,
                 "rev": prev_rev,
                 "locations": locations,
+                "all_tags": all_tags,
+                "item_tag_ids": set(tag_ids),
                 "errors": errors,
                 "photo_url": photo_url,
             },
         )
+
+    # Update item tags
+    if tag_ids:
+        item.tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+    else:
+        item.tags = []
 
     new_num = (prev_rev.revision_num + 1) if prev_rev else 1
     revision = ItemRevision(

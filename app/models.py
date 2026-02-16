@@ -4,10 +4,18 @@ import secrets
 from datetime import date, datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+item_tags = Table(
+    "item_tags",
+    Base.metadata,
+    Column("item_id", Integer, ForeignKey("food_items.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+    UniqueConstraint("item_id", "tag_id"),
+)
 
 
 def _utcnow() -> datetime:
@@ -30,6 +38,7 @@ class FoodItem(Base):
     revisions: Mapped[List[ItemRevision]] = relationship(
         back_populates="item", order_by="ItemRevision.revision_num"
     )
+    tags: Mapped[List[Tag]] = relationship(secondary=item_tags, back_populates="items")
 
     @property
     def latest_revision(self) -> Optional[ItemRevision]:
@@ -85,6 +94,17 @@ class RevisionLink(Base):
     label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     revision: Mapped[ItemRevision] = relationship(back_populates="links")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    items: Mapped[List[FoodItem]] = relationship(secondary=item_tags, back_populates="tags")
 
 
 class StorageLocation(Base):

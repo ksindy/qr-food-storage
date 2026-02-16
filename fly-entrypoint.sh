@@ -18,6 +18,36 @@ if os.path.exists(db_path):
     conn.close()
 "
 
+# Create tags and item_tags tables if they don't exist
+python -c "
+import sqlite3, os
+db_path = '/data/food_storage.db'
+if os.path.exists(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            is_default BOOLEAN DEFAULT 0,
+            created_at DATETIME
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS item_tags (
+            item_id INTEGER REFERENCES food_items(id),
+            tag_id INTEGER REFERENCES tags(id),
+            PRIMARY KEY (item_id, tag_id),
+            UNIQUE (item_id, tag_id)
+        )
+    ''')
+    # Seed default tag
+    cur = conn.execute(\"SELECT id FROM tags WHERE name = 'Prepared Meals'\")
+    if not cur.fetchone():
+        conn.execute(\"INSERT INTO tags (name, is_default) VALUES ('Prepared Meals', 1)\")
+    conn.commit()
+    conn.close()
+"
+
 # Run with gunicorn + uvicorn workers
 exec gunicorn app.main:app \
     --bind 0.0.0.0:8000 \
