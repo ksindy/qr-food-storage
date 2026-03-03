@@ -41,15 +41,16 @@
 
     <div class="grid">
         <label>
-            Amount (optional)
-            <input type="number" name="amount" step="any" min="0" placeholder="e.g. 2, 1.5" value="{{ form.amount if form is defined and form.amount else '' }}">
+            Amount
+            <input type="number" name="amount" step="any" min="0" placeholder="e.g. 2, 1.5" value="{{ form.amount if form is defined and form.amount else '1' }}">
         </label>
         <label>
             Unit
             <select name="amount_unit">
                 <option value="">--</option>
+                {% set default_unit = form.amount_unit if form is defined and form.amount_unit else "qty" %}
                 {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
-                <option value="{{ u }}" {% if form is defined and form.amount_unit == u %}selected{% endif %}>{{ u }}</option>
+                <option value="{{ u }}" {% if default_unit == u %}selected{% endif %}>{{ u }}</option>
                 {% endfor %}
             </select>
         </label>

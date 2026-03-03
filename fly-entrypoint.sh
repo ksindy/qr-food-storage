@@ -49,6 +49,55 @@ if os.path.exists(db_path):
     conn.close()
 "
 
+# Create inventory_entries table and migrate existing data
+python -c "
+import sqlite3, os
+db_path = '/data/food_storage.db'
+if os.path.exists(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS inventory_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id INTEGER NOT NULL REFERENCES food_items(id),
+            date_prepared DATE NOT NULL,
+            expiration_date DATE,
+            amount REAL DEFAULT 1,
+            amount_unit VARCHAR(20) DEFAULT 'qty',
+            is_consumed BOOLEAN DEFAULT 0,
+            created_at DATETIME,
+            consumed_at DATETIME
+        )
+    ''')
+    conn.execute('''
+        CREATE INDEX IF NOT EXISTS ix_inventory_entries_item_id
+        ON inventory_entries(item_id)
+    ''')
+    # Seed one entry per existing item from its latest revision
+    conn.execute('''
+        INSERT INTO inventory_entries (item_id, date_prepared, expiration_date,
+            amount, amount_unit, is_consumed, created_at, consumed_at)
+        SELECT
+            fi.id,
+            lr.date_prepared,
+            lr.expiration_date,
+            COALESCE(lr.amount, 1),
+            COALESCE(lr.amount_unit, 'qty'),
+            lr.is_deleted,
+            lr.created_at,
+            CASE WHEN lr.is_deleted THEN lr.created_at ELSE NULL END
+        FROM food_items fi
+        JOIN item_revisions lr ON lr.item_id = fi.id
+        WHERE lr.revision_num = (
+            SELECT MAX(revision_num) FROM item_revisions WHERE item_id = fi.id
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM inventory_entries WHERE item_id = fi.id
+        )
+    ''')
+    conn.commit()
+    conn.close()
+"
+
 # Run with gunicorn + uvicorn workers
 exec gunicorn app.main:app \
     --bind 0.0.0.0:8000 \

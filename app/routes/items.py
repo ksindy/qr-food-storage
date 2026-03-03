@@ -8,7 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import FoodItem, ItemRevision, RevisionLink, StorageLocation, Tag
+from app.models import FoodItem, InventoryEntry, ItemRevision, RevisionLink, StorageLocation, Tag
 from app.photo import photo_url, save_photo
 from app.qr import generate_qr_png, item_url
 from app.templating import templates
@@ -29,6 +29,7 @@ def _get_item_or_404(public_id: str, db: Session) -> FoodItem:
             joinedload(FoodItem.revisions)
             .joinedload(ItemRevision.storage_location),
             joinedload(FoodItem.tags),
+            joinedload(FoodItem.entries),
         )
         .filter(FoodItem.public_id == public_id)
         .first()
@@ -73,7 +74,7 @@ def item_list(
             & (ItemRevision.revision_num == latest_rev_sq.c.max_rev),
         )
         .options(
-            joinedload(ItemRevision.item),
+            joinedload(ItemRevision.item).joinedload(FoodItem.entries),
             joinedload(ItemRevision.storage_location),
         )
     )
@@ -85,7 +86,7 @@ def item_list(
     if location:
         query = query.filter(ItemRevision.storage_location_id == location)
 
-    revisions = query.order_by(ItemRevision.expiration_date.asc()).all()
+    revisions = query.all()
 
     # Group revisions by location for carousel layout
     loc_items = {loc.id: [] for loc in locations}
@@ -97,6 +98,7 @@ def item_list(
     for loc in locations:
         items = loc_items.get(loc.id, [])
         if items:
+            items.sort(key=lambda r: r.item.earliest_expiry or date.max)
             sections.append({"location": loc, "revisions": items})
 
     # Build tag sections for default tags
@@ -111,7 +113,7 @@ def item_list(
             if item.id in rev_by_item:
                 tag_revs.append(rev_by_item[item.id])
         if tag_revs:
-            tag_revs.sort(key=lambda r: r.expiration_date or date.max)
+            tag_revs.sort(key=lambda r: r.item.earliest_expiry or date.max)
             tag_sections.append({"tag": tag, "revisions": tag_revs})
 
     # Build "Expiring Soon" section (within 3 days, not already expired)
@@ -119,9 +121,9 @@ def item_list(
     soon = today_ + timedelta(days=3)
     expiring_soon = [
         rev for rev in revisions
-        if rev.expiration_date
-        and not rev.is_deleted
-        and today_ <= rev.expiration_date <= soon
+        if not rev.is_deleted
+        and rev.item.earliest_expiry
+        and today_ <= rev.item.earliest_expiry <= soon
     ]
 
     return templates.TemplateResponse(
@@ -244,18 +246,27 @@ async def create_item(
         revision_num=1,
         name=name.strip(),
         date_prepared=date_prepared,
-        expiration_date=exp,
+        expiration_date=None,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
-        amount=amount,
-        amount_unit=amount_unit.strip() or None,
+        amount=None,
+        amount_unit=None,
     )
     db.add(revision)
     db.flush()
 
     for url, label in clean_links:
         db.add(RevisionLink(revision_id=revision.id, url=url, label=label))
+
+    entry = InventoryEntry(
+        item_id=item.id,
+        date_prepared=date_prepared,
+        expiration_date=exp,
+        amount=amount if amount is not None else 1,
+        amount_unit=amount_unit.strip() or "qty",
+    )
+    db.add(entry)
 
     db.commit()
     return RedirectResponse(f"/i/{item.public_id}", status_code=303)
@@ -267,6 +278,7 @@ async def create_item(
 def item_detail(public_id: str, request: Request, db: Session = Depends(get_db)):
     item = _get_item_or_404(public_id, db)
     rev = item.latest_revision
+    today_ = date.today()
 
     return templates.TemplateResponse(
         "items/detail.html",
@@ -275,9 +287,12 @@ def item_detail(public_id: str, request: Request, db: Session = Depends(get_db))
             "item": item,
             "rev": rev,
             "is_deleted": item.is_deleted,
+            "entries": item.active_entries,
+            "consumed_count": len([e for e in item.entries if e.is_consumed]),
             "photo_url": photo_url,
             "item_url": item_url(public_id),
-            "today": date.today(),
+            "today": today_,
+            "default_exp": today_ + timedelta(days=7),
         },
     )
 
@@ -304,6 +319,7 @@ def printable_label(public_id: str, request: Request, db: Session = Depends(get_
             "request": request,
             "item": item,
             "rev": rev,
+            "earliest_expiry": item.earliest_expiry,
             "qr_url": f"/i/{public_id}/qr.png",
         },
     )
@@ -338,14 +354,10 @@ async def save_edit(
     public_id: str,
     request: Request,
     name: str = Form(...),
-    date_prepared: date = Form(...),
-    expiration_date: Optional[date] = Form(None),
     storage_location_id: int = Form(...),
     link_urls: List[str] = Form(default=[]),
     link_labels: List[str] = Form(default=[]),
     notes: str = Form(""),
-    amount: Optional[float] = Form(None),
-    amount_unit: str = Form(""),
     tag_ids: List[int] = Form(default=[]),
     photo: Optional[UploadFile] = File(None),
     keep_photo: bool = Form(False),
@@ -357,10 +369,6 @@ async def save_edit(
     errors = []
     if not name.strip():
         errors.append("Name is required.")
-
-    exp = expiration_date or (date_prepared + timedelta(days=7))
-    if exp < date_prepared:
-        errors.append("Expiration date must be on or after date prepared.")
 
     clean_links = []
     for url, label in zip(link_urls, link_labels):
@@ -409,13 +417,13 @@ async def save_edit(
         item_id=item.id,
         revision_num=new_num,
         name=name.strip(),
-        date_prepared=date_prepared,
-        expiration_date=exp,
+        date_prepared=prev_rev.date_prepared if prev_rev else date.today(),
+        expiration_date=None,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
-        amount=amount,
-        amount_unit=amount_unit.strip() or None,
+        amount=None,
+        amount_unit=None,
     )
     db.add(revision)
     db.flush()
@@ -427,49 +435,56 @@ async def save_edit(
     return RedirectResponse(f"/i/{public_id}", status_code=303)
 
 
-# --- Quick update amount ---
+# --- Inventory entries ---
 
-@router.post("/i/{public_id}/amount")
-def update_amount(
+@router.post("/i/{public_id}/entries")
+def add_entry(
     public_id: str,
+    date_prepared: date = Form(...),
+    expiration_date: Optional[date] = Form(None),
     amount: Optional[float] = Form(None),
     amount_unit: str = Form(""),
     db: Session = Depends(get_db),
 ):
     item = _get_item_or_404(public_id, db)
-    prev = item.latest_revision
-
-    revision = ItemRevision(
+    exp = expiration_date or (date_prepared + timedelta(days=7))
+    entry = InventoryEntry(
         item_id=item.id,
-        revision_num=(prev.revision_num + 1) if prev else 1,
-        name=prev.name if prev else "Unknown",
-        date_prepared=prev.date_prepared if prev else date.today(),
-        expiration_date=prev.expiration_date if prev else None,
-        storage_location_id=prev.storage_location_id if prev else 1,
-        photo_filename=prev.photo_filename if prev else None,
-        notes=prev.notes if prev else None,
-        amount=amount,
-        amount_unit=amount_unit.strip() or None,
-        is_deleted=prev.is_deleted if prev else False,
+        date_prepared=date_prepared,
+        expiration_date=exp,
+        amount=amount if amount is not None else 1,
+        amount_unit=amount_unit.strip() or "qty",
     )
-    db.add(revision)
-    db.flush()
-
-    # Copy links from previous revision
-    if prev:
-        for link in prev.links:
-            db.add(RevisionLink(
-                revision_id=revision.id, url=link.url, label=link.label
-            ))
-
+    db.add(entry)
     db.commit()
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(f"/i/{public_id}", status_code=303)
+
+
+@router.post("/i/{public_id}/entries/{entry_id}/consume")
+def consume_entry(
+    public_id: str,
+    entry_id: int,
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    entry = db.query(InventoryEntry).filter(
+        InventoryEntry.id == entry_id,
+        InventoryEntry.item_id == FoodItem.id,
+        FoodItem.public_id == public_id,
+    ).join(FoodItem).first()
+    if not entry:
+        raise _not_found()
+    entry.is_consumed = True
+    entry.consumed_at = datetime.now(timezone.utc)
+    db.commit()
+    return RedirectResponse(f"/i/{public_id}", status_code=303)
 
 
 # --- Delete ---
 
 @router.post("/i/{public_id}/delete")
 def soft_delete(public_id: str, db: Session = Depends(get_db)):
+    from datetime import datetime, timezone
     item = _get_item_or_404(public_id, db)
     prev = item.latest_revision
 
@@ -478,15 +493,22 @@ def soft_delete(public_id: str, db: Session = Depends(get_db)):
         revision_num=(prev.revision_num + 1) if prev else 1,
         name=prev.name if prev else "Unknown",
         date_prepared=prev.date_prepared if prev else date.today(),
-        expiration_date=prev.expiration_date if prev else None,
+        expiration_date=None,
         storage_location_id=prev.storage_location_id if prev else 1,
         photo_filename=prev.photo_filename if prev else None,
         notes=prev.notes if prev else None,
-        amount=prev.amount if prev else None,
-        amount_unit=prev.amount_unit if prev else None,
+        amount=None,
+        amount_unit=None,
         is_deleted=True,
     )
     db.add(revision)
+
+    # Mark all active entries as consumed
+    now = datetime.now(timezone.utc)
+    for entry in item.active_entries:
+        entry.is_consumed = True
+        entry.consumed_at = now
+
     db.commit()
     return RedirectResponse(f"/i/{public_id}", status_code=303)
 
@@ -506,12 +528,12 @@ def restore_item(public_id: str, db: Session = Depends(get_db)):
         revision_num=(prev.revision_num + 1) if prev else 1,
         name=source.name,
         date_prepared=source.date_prepared,
-        expiration_date=source.expiration_date,
+        expiration_date=None,
         storage_location_id=source.storage_location_id,
         photo_filename=source.photo_filename,
         notes=source.notes,
-        amount=source.amount,
-        amount_unit=source.amount_unit,
+        amount=None,
+        amount_unit=None,
         is_deleted=False,
     )
     db.add(revision)
@@ -625,12 +647,12 @@ async def reuse_label(
         revision_num=new_num,
         name=name.strip(),
         date_prepared=date_prepared,
-        expiration_date=exp,
+        expiration_date=None,
         storage_location_id=storage_location_id,
         photo_filename=photo_filename,
         notes=notes.strip() or None,
-        amount=amount,
-        amount_unit=amount_unit.strip() or None,
+        amount=None,
+        amount_unit=None,
         is_deleted=False,
     )
     db.add(revision)
@@ -638,6 +660,15 @@ async def reuse_label(
 
     for url, label in clean_links:
         db.add(RevisionLink(revision_id=revision.id, url=url, label=label))
+
+    entry = InventoryEntry(
+        item_id=item.id,
+        date_prepared=date_prepared,
+        expiration_date=exp,
+        amount=amount if amount is not None else 1,
+        amount_unit=amount_unit.strip() or "qty",
+    )
+    db.add(entry)
 
     db.commit()
     return RedirectResponse(f"/i/{public_id}", status_code=303)

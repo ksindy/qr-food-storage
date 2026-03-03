@@ -39,6 +39,9 @@ class FoodItem(Base):
         back_populates="item", order_by="ItemRevision.revision_num"
     )
     tags: Mapped[List[Tag]] = relationship(secondary=item_tags, back_populates="items")
+    entries: Mapped[List[InventoryEntry]] = relationship(
+        back_populates="item", order_by="InventoryEntry.expiration_date"
+    )
 
     @property
     def latest_revision(self) -> Optional[ItemRevision]:
@@ -55,6 +58,15 @@ class FoodItem(Base):
     def is_deleted(self) -> bool:
         latest = self.latest_revision
         return latest.is_deleted if latest else False
+
+    @property
+    def active_entries(self) -> List[InventoryEntry]:
+        return [e for e in self.entries if not e.is_consumed]
+
+    @property
+    def earliest_expiry(self) -> Optional[date]:
+        dates = [e.expiration_date for e in self.active_entries if e.expiration_date]
+        return min(dates) if dates else None
 
 
 class ItemRevision(Base):
@@ -105,6 +117,22 @@ class Tag(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
     items: Mapped[List[FoodItem]] = relationship(secondary=item_tags, back_populates="tags")
+
+
+class InventoryEntry(Base):
+    __tablename__ = "inventory_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("food_items.id"), index=True)
+    date_prepared: Mapped[date] = mapped_column(Date)
+    expiration_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    amount: Mapped[float] = mapped_column(Float, default=1)
+    amount_unit: Mapped[str] = mapped_column(String(20), default="qty")
+    is_consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    item: Mapped[FoodItem] = relationship(back_populates="entries")
 
 
 class StorageLocation(Base):

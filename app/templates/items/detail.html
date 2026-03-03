@@ -20,7 +20,7 @@
         <h2 style="margin-bottom:0.25rem">{{ rev.name }}</h2>
         <div class="item-meta">
             <span class="badge badge-location" data-location="{{ rev.storage_location.name|lower }}">{{ rev.storage_location.name }}</span>
-            {% if rev.expiration_date and rev.expiration_date < today and not is_deleted %}
+            {% if item.earliest_expiry and item.earliest_expiry < today and not is_deleted %}
                 <span class="badge badge-expired">Expired</span>
             {% endif %}
             {% for tag in item.tags %}
@@ -37,12 +37,8 @@
 
 <table>
     <tbody>
-        <tr><th>Date prepared</th><td>{{ rev.date_prepared.strftime('%B %d, %Y') }}</td></tr>
-        <tr><th>Expiration date</th><td>{{ rev.expiration_date.strftime('%B %d, %Y') if rev.expiration_date else '—' }}</td></tr>
         <tr><th>Storage location</th><td>{{ rev.storage_location.name }}</td></tr>
-        {% if rev.amount %}
-        <tr><th>Amount</th><td>{{ rev.amount }}{% if rev.amount_unit %} {{ rev.amount_unit }}{% endif %}</td></tr>
-        {% endif %}
+        <tr><th>Active entries</th><td>{{ entries|length }}</td></tr>
     </tbody>
 </table>
 
@@ -62,6 +58,79 @@
     <li><a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label or link.url }}</a></li>
     {% endfor %}
 </ul>
+{% endif %}
+
+<h4>Inventory ({{ entries|length }} active)</h4>
+{% if entries %}
+<table>
+    <thead>
+        <tr>
+            <th>Prepared</th>
+            <th>Expires</th>
+            <th>Amount</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entry in entries %}
+        <tr>
+            <td>{{ entry.date_prepared.strftime('%b %d, %Y') }}</td>
+            <td>
+                {{ entry.expiration_date.strftime('%b %d, %Y') if entry.expiration_date else '---' }}
+                {% if entry.expiration_date and entry.expiration_date < today %}
+                <span class="badge badge-expired">Expired</span>
+                {% endif %}
+            </td>
+            <td>{{ entry.amount }}{% if entry.amount_unit %} {{ entry.amount_unit }}{% endif %}</td>
+            <td>
+                <form method="post" action="/i/{{ item.public_id }}/entries/{{ entry.id }}/consume" style="display:inline">
+                    <button type="submit" class="outline" style="padding:0.2rem 0.5rem;margin:0">Use</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No active entries. Add one below.</p>
+{% endif %}
+
+{% if consumed_count %}
+<p><small>{{ consumed_count }} previously consumed</small></p>
+{% endif %}
+
+{% if not is_deleted %}
+<details>
+    <summary>Add another entry</summary>
+    <form method="post" action="/i/{{ item.public_id }}/entries">
+        <div class="grid">
+            <label>
+                Date prepared
+                <input type="date" name="date_prepared" value="{{ today }}" required>
+            </label>
+            <label>
+                Expiration date
+                <input type="date" name="expiration_date" value="{{ default_exp }}">
+            </label>
+        </div>
+        <div class="grid">
+            <label>
+                Amount
+                <input type="number" name="amount" step="any" min="0" value="1">
+            </label>
+            <label>
+                Unit
+                <select name="amount_unit">
+                    <option value="">--</option>
+                    {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                    <option value="{{ u }}" {% if u == 'qty' %}selected{% endif %}>{{ u }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <button type="submit">Add Entry</button>
+    </form>
+</details>
 {% endif %}
 
 <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:2rem">

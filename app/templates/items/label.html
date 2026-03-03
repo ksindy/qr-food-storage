@@ -107,8 +107,8 @@
     <div class="label">
         <img src="{{ qr_url }}" alt="QR">
         <div class="label-name">{{ rev.name[:30] if rev else '' }}</div>
-        {% if rev and rev.expiration_date %}
-        <div class="label-exp">Exp: {{ rev.expiration_date.strftime('%m/%d/%y') }}</div>
+        {% if earliest_expiry %}
+        <div class="label-exp">Exp: {{ earliest_expiry.strftime('%m/%d/%y') }}</div>
         {% endif %}
     </div>
 </body>
