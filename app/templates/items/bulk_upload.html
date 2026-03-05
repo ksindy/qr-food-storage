@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Add Items - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>Add Items</h2>
+<p>Take photos of food labels to auto-fill names, or skip to add items manually.</p>
+
+{% if not api_key_set %}
+<article style="background:var(--pico-del-color);color:#fff;padding:0.75rem 1rem">
+    This feature requires a Google Cloud Vision API key. Set <code>GOOGLE_CLOUD_API_KEY</code> in your environment.
+</article>
+{% endif %}
+
+<form method="post" action="/items/bulk" enctype="multipart/form-data">
+    <label>
+        Default storage location *
+        <select name="storage_location_id" required>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <input type="file" name="photos" accept="image/*" multiple id="photo-input" style="display:none">
+    <button type="button" onclick="document.getElementById('photo-input').click()" class="outline" {% if not api_key_set %}disabled{% endif %}>Add Images</button>
+    <div id="photo-count" style="margin-top:0.5rem"><small>No images selected. You can add items manually.</small></div>
+
+    <button type="submit" style="margin-top:1rem">Continue</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('photo-input').addEventListener('change', function() {
+    var count = this.files.length;
+    var el = document.getElementById('photo-count');
+    if (count === 0) {
+        el.innerHTML = '<small>No images selected. You can add items manually.</small>';
+    } else if (count > 6) {
+        el.innerHTML = '<small><strong>' + count + ' images selected</strong> (max 6 — only the first 6 will be used)</small>';
+    } else {
+        el.innerHTML = '<small><strong>' + count + ' image' + (count > 1 ? 's' : '') + ' selected</strong></small>';
+    }
+});
+</script>
+{% endblock %}

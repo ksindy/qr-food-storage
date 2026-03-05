@@ -16,3 +16,5 @@ _default_upload_dir = "/data/uploads" if DATABASE_URL.startswith("sqlite:////dat
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", _default_upload_dir))
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+GOOGLE_CLOUD_API_KEY = os.getenv("GOOGLE_CLOUD_API_KEY", "")

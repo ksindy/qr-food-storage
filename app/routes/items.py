@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Optional, List
 
@@ -7,8 +8,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from rapidfuzz import process as fuzz_process, fuzz
+
+from app.config import GOOGLE_CLOUD_API_KEY
 from app.database import get_db
 from app.models import FoodItem, InventoryEntry, ItemRevision, RevisionLink, StorageLocation, Tag
+from app.ocr import extract_text, guess_food_name
 from app.photo import photo_url, save_photo
 from app.qr import generate_qr_png, item_url
 from app.templating import templates
@@ -270,6 +275,311 @@ async def create_item(
 
     db.commit()
     return RedirectResponse(f"/i/{item.public_id}", status_code=303)
+
+
+# --- Bulk add ---
+
+@router.get("/items/bulk", response_class=HTMLResponse)
+def bulk_upload_form(request: Request, db: Session = Depends(get_db)):
+    locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+    return templates.TemplateResponse(
+        "items/bulk_upload.html",
+        {
+            "request": request,
+            "locations": locations,
+            "api_key_set": bool(GOOGLE_CLOUD_API_KEY),
+        },
+    )
+
+
+@router.post("/items/bulk", response_class=HTMLResponse)
+async def bulk_upload_process(
+    request: Request,
+    storage_location_id: int = Form(...),
+    photos: List[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+):
+    if len(photos) > 6:
+        photos = photos[:6]
+
+    items = []
+    has_photos = any(p.filename for p in photos)
+
+    if not has_photos:
+        # No photos — add one blank item for manual entry
+        items.append({
+            "filename": "",
+            "photo_url": None,
+            "name": "",
+            "raw_text": "",
+            "grouped": False,
+            "group_key": "",
+        })
+
+    for photo in photos:
+        if not photo.filename:
+            continue
+        try:
+            filename = await save_photo(photo)
+        except ValueError:
+            continue
+
+        raw_text = extract_text(filename)
+        name = guess_food_name(raw_text)
+
+        items.append({
+            "filename": filename,
+            "photo_url": photo_url(filename),
+            "name": name,
+            "raw_text": raw_text,
+            "grouped": False,
+        })
+
+    # Auto-detect matching names for grouping
+    name_counts = defaultdict(int)
+    for item in items:
+        if item["name"]:
+            name_counts[item["name"].strip().lower()] += 1
+    for item in items:
+        key = item["name"].strip().lower() if item["name"] else ""
+        if key and name_counts[key] > 1:
+            item["grouped"] = True
+            item["group_key"] = key
+        else:
+            item["group_key"] = ""
+
+    # Fuzzy-match against existing non-deleted items
+    latest_rev_sq = (
+        db.query(
+            ItemRevision.item_id,
+            func.max(ItemRevision.revision_num).label("max_rev"),
+        )
+        .group_by(ItemRevision.item_id)
+        .subquery()
+    )
+    existing_revs = (
+        db.query(ItemRevision)
+        .join(
+            latest_rev_sq,
+            (ItemRevision.item_id == latest_rev_sq.c.item_id)
+            & (ItemRevision.revision_num == latest_rev_sq.c.max_rev),
+        )
+        .options(
+            joinedload(ItemRevision.item).joinedload(FoodItem.entries),
+        )
+        .filter(ItemRevision.is_deleted == False)  # noqa: E712
+        .all()
+    )
+    existing_choices = {
+        rev.name: {
+            "public_id": rev.item.public_id,
+            "name": rev.name,
+            "entry_count": len([e for e in rev.item.entries if not e.is_consumed]),
+        }
+        for rev in existing_revs
+    }
+    existing_names = list(existing_choices.keys())
+
+    for item in items:
+        item["existing_match"] = None
+        if item["name"] and existing_names:
+            result = fuzz_process.extractOne(
+                item["name"], existing_names, scorer=fuzz.ratio, score_cutoff=75
+            )
+            if result:
+                matched_name = result[0]
+                item["existing_match"] = existing_choices[matched_name]
+
+    locations = db.query(StorageLocation).order_by(StorageLocation.name).all()
+    today_ = date.today()
+    return templates.TemplateResponse(
+        "items/bulk_review.html",
+        {
+            "request": request,
+            "items": items,
+            "locations": locations,
+            "default_location_id": storage_location_id,
+            "today": today_,
+            "default_exp": today_ + timedelta(days=7),
+        },
+    )
+
+
+@router.post("/items/bulk/confirm")
+async def bulk_confirm(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+
+    # Parse indexed form fields
+    items_data = []
+    i = 0
+    while True:
+        name = form.get(f"items[{i}].name")
+        if name is None:
+            break
+        items_data.append({
+            "name": name.strip(),
+            "filename": form.get(f"items[{i}].filename", ""),
+            "date_prepared": form.get(f"items[{i}].date_prepared", ""),
+            "expiration_date": form.get(f"items[{i}].expiration_date", ""),
+            "storage_location_id": int(form.get(f"items[{i}].storage_location_id", "1")),
+            "amount": form.get(f"items[{i}].amount", "1"),
+            "amount_unit": form.get(f"items[{i}].amount_unit", "qty"),
+            "group_key": form.get(f"items[{i}].group_key", ""),
+            "existing_id": form.get(f"items[{i}].existing_id", ""),
+        })
+        i += 1
+
+    if not items_data:
+        return RedirectResponse("/items/bulk", status_code=303)
+
+    # Separate items destined for existing DB items vs new ones
+    existing_items = []
+    new_items = []
+    for item in items_data:
+        if item["existing_id"]:
+            existing_items.append(item)
+        else:
+            new_items.append(item)
+
+    # Group new items by group_key
+    grouped = defaultdict(list)
+    ungrouped = []
+    for item in new_items:
+        if item["group_key"]:
+            grouped[item["group_key"]].append(item)
+        else:
+            ungrouped.append(item)
+
+    today_ = date.today()
+
+    def _parse_date(val, fallback):
+        if not val:
+            return fallback
+        try:
+            return date.fromisoformat(val)
+        except ValueError:
+            return fallback
+
+    def _create_food_item(item_data_list):
+        """Create one FoodItem with one revision and N inventory entries."""
+        first = item_data_list[0]
+        food_item = FoodItem()
+        db.add(food_item)
+        db.flush()
+
+        dp = _parse_date(first["date_prepared"], today_)
+        revision = ItemRevision(
+            item_id=food_item.id,
+            revision_num=1,
+            name=first["name"] or "Unknown",
+            date_prepared=dp,
+            expiration_date=None,
+            storage_location_id=first["storage_location_id"],
+            photo_filename=first["filename"] or None,
+            notes=None,
+            amount=None,
+            amount_unit=None,
+        )
+        db.add(revision)
+
+        for item_d in item_data_list:
+            idp = _parse_date(item_d["date_prepared"], today_)
+            iexp = _parse_date(item_d["expiration_date"], idp + timedelta(days=7))
+            try:
+                amt = float(item_d["amount"]) if item_d["amount"] else 1
+            except ValueError:
+                amt = 1
+            entry = InventoryEntry(
+                item_id=food_item.id,
+                date_prepared=idp,
+                expiration_date=iexp,
+                amount=amt,
+                amount_unit=item_d["amount_unit"].strip() or "qty",
+            )
+            db.add(entry)
+
+    # Add entries to existing items
+    for item_d in existing_items:
+        food_item = (
+            db.query(FoodItem)
+            .filter(FoodItem.public_id == item_d["existing_id"])
+            .first()
+        )
+        if not food_item:
+            continue
+        idp = _parse_date(item_d["date_prepared"], today_)
+        iexp = _parse_date(item_d["expiration_date"], idp + timedelta(days=7))
+        try:
+            amt = float(item_d["amount"]) if item_d["amount"] else 1
+        except ValueError:
+            amt = 1
+        entry = InventoryEntry(
+            item_id=food_item.id,
+            date_prepared=idp,
+            expiration_date=iexp,
+            amount=amt,
+            amount_unit=item_d["amount_unit"].strip() or "qty",
+        )
+        db.add(entry)
+
+    # Create grouped items (one FoodItem per group)
+    for group_items in grouped.values():
+        _create_food_item(group_items)
+
+    # Create ungrouped items (one FoodItem each)
+    for item in ungrouped:
+        _create_food_item([item])
+
+    db.commit()
+    return RedirectResponse("/", status_code=303)
+
+
+@router.get("/api/match-item")
+def match_item(q: str = Query(""), db: Session = Depends(get_db)):
+    """Return the best fuzzy match for a name against existing non-deleted items."""
+    q = q.strip()
+    if not q:
+        return {"match": None}
+
+    latest_rev_sq = (
+        db.query(
+            ItemRevision.item_id,
+            func.max(ItemRevision.revision_num).label("max_rev"),
+        )
+        .group_by(ItemRevision.item_id)
+        .subquery()
+    )
+    existing_revs = (
+        db.query(ItemRevision)
+        .join(
+            latest_rev_sq,
+            (ItemRevision.item_id == latest_rev_sq.c.item_id)
+            & (ItemRevision.revision_num == latest_rev_sq.c.max_rev),
+        )
+        .options(
+            joinedload(ItemRevision.item).joinedload(FoodItem.entries),
+        )
+        .filter(ItemRevision.is_deleted == False)  # noqa: E712
+        .all()
+    )
+
+    choices = {}
+    for rev in existing_revs:
+        choices[rev.name] = {
+            "public_id": rev.item.public_id,
+            "name": rev.name,
+            "entry_count": len([e for e in rev.item.entries if not e.is_consumed]),
+        }
+
+    if not choices:
+        return {"match": None}
+
+    result = fuzz_process.extractOne(
+        q, list(choices.keys()), scorer=fuzz.ratio, score_cutoff=75
+    )
+    if result:
+        return {"match": choices[result[0]]}
+    return {"match": None}
 
 
 # --- Item detail ---

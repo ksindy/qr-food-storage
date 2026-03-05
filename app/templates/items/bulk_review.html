@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Review Items - QR Food Storage{% endblock %}
+
+{% block content %}
+<h2>Review Scanned Items</h2>
+<p>Edit names, dates, and locations, then confirm to create items. Check "Group" for items that should share one QR code.</p>
+
+{% if errors is defined and errors %}
+<article style="background:var(--pico-del-color);color:#fff;padding:0.75rem 1rem">
+    <ul style="margin:0;padding-left:1.2rem">
+        {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+</article>
+{% endif %}
+
+<form method="post" action="/items/bulk/confirm">
+    {% for item in items %}
+    <article>
+        <div class="grid">
+            <div>
+                {% if item.photo_url %}
+                <img src="{{ item.photo_url }}" alt="Photo" style="max-width:150px;max-height:150px;border-radius:4px">
+                {% endif %}
+                <input type="hidden" name="items[{{ loop.index0 }}].filename" value="{{ item.filename }}">
+            </div>
+            <div>
+                <label>
+                    Name *
+                    <input type="text" name="items[{{ loop.index0 }}].name" value="{{ item.name }}" required>
+                </label>
+                <div class="grid">
+                    <label>
+                        Date prepared
+                        <input type="date" name="items[{{ loop.index0 }}].date_prepared" value="{{ today }}">
+                    </label>
+                    <label>
+                        Expiration date
+                        <input type="date" name="items[{{ loop.index0 }}].expiration_date" value="{{ default_exp }}">
+                    </label>
+                </div>
+                <label>
+                    Storage location
+                    <select name="items[{{ loop.index0 }}].storage_location_id">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if loc.id == default_location_id %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <div class="grid">
+                    <label>
+                        Amount
+                        <input type="number" name="items[{{ loop.index0 }}].amount" step="any" min="0" value="1">
+                    </label>
+                    <label>
+                        Unit
+                        <select name="items[{{ loop.index0 }}].amount_unit">
+                            {% for u in ["qty", "cups", "oz", "lbs", "grams", "liters", "ml"] %}
+                            <option value="{{ u }}" {% if u == "qty" %}selected{% endif %}>{{ u }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <div class="match-container" data-index="{{ loop.index0 }}">
+                {% if item.existing_match %}
+                <fieldset class="match-choice">
+                    <legend><small>Similar item found in database</small></legend>
+                    <label>
+                        <input type="radio" name="items[{{ loop.index0 }}].match_action" value="existing" checked class="match-radio" data-index="{{ loop.index0 }}">
+                        Add to existing: <strong>{{ item.existing_match.name }}</strong> ({{ item.existing_match.entry_count }} entr{{ "y" if item.existing_match.entry_count == 1 else "ies" }}) — uses existing QR code
+                    </label>
+                    <label>
+                        <input type="radio" name="items[{{ loop.index0 }}].match_action" value="new" class="match-radio" data-index="{{ loop.index0 }}">
+                        Create as new item
+                    </label>
+                </fieldset>
+                {% endif %}
+                </div>
+                <input type="hidden" name="items[{{ loop.index0 }}].existing_id" value="{{ item.existing_match.public_id if item.existing_match else '' }}" class="existing-id" data-index="{{ loop.index0 }}">
+
+                {% if item.grouped %}
+                <label class="group-label" data-index="{{ loop.index0 }}" {% if item.existing_match %}style="display:none"{% endif %}>
+                    <input type="checkbox" name="items[{{ loop.index0 }}].group" value="1" class="group-checkbox" data-index="{{ loop.index0 }}" checked>
+                    Group with same-name items (share one QR code)
+                </label>
+                {% endif %}
+                <input type="hidden" name="items[{{ loop.index0 }}].group_key" value="{{ item.group_key }}" class="group-key" data-index="{{ loop.index0 }}">
+
+                {% if item.raw_text %}
+                <details>
+                    <summary>Raw OCR text</summary>
+                    <pre style="font-size:0.8rem;white-space:pre-wrap">{{ item.raw_text }}</pre>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+
+    <button type="submit">Create {{ items|length }} Item(s)</button>
+    <a href="/items/bulk" role="button" class="outline secondary">Start Over</a>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update group_key hidden fields based on checkbox state and name values
+function updateGroupKeys() {
+    document.querySelectorAll('.group-key').forEach(function(groupKey) {
+        var idx = groupKey.getAttribute('data-index');
+        var checkbox = document.querySelector('.group-checkbox[data-index="' + idx + '"]');
+        var nameInput = document.querySelector('input[name="items[' + idx + '].name"]');
+        if (checkbox && checkbox.checked && nameInput && nameInput.value.trim()) {
+            groupKey.value = nameInput.value.trim().toLowerCase();
+        } else if (!checkbox) {
+            // No checkbox means not grouped — keep server-set value cleared
+            groupKey.value = '';
+        } else {
+            groupKey.value = '';
+        }
+    });
+}
+
+// Handle match radio buttons: toggle existing_id and group checkbox visibility
+function updateMatchActions() {
+    var radios = document.querySelectorAll('.match-radio');
+    radios.forEach(function(radio) {
+        var idx = radio.getAttribute('data-index');
+        var existingId = document.querySelector('.existing-id[data-index="' + idx + '"]');
+        var groupLabel = document.querySelector('.group-label[data-index="' + idx + '"]');
+        if (!existingId) return;
+
+        var selected = document.querySelector('input[name="items[' + idx + '].match_action"]:checked');
+        if (selected && selected.value === 'existing') {
+            existingId.value = existingId.getAttribute('data-original') || existingId.value;
+            if (groupLabel) groupLabel.style.display = 'none';
+        } else {
+            if (!existingId.getAttribute('data-original')) {
+                existingId.setAttribute('data-original', existingId.value);
+            }
+            existingId.value = '';
+            if (groupLabel) groupLabel.style.display = '';
+        }
+    });
+    updateGroupKeys();
+}
+
+// Live fuzzy match: check name against DB when user edits it
+var matchTimers = {};
+function checkNameMatch(idx) {
+    var nameInput = document.querySelector('input[name="items[' + idx + '].name"]');
+    if (!nameInput) return;
+    var name = nameInput.value.trim();
+    var container = document.querySelector('.match-container[data-index="' + idx + '"]');
+    var existingId = document.querySelector('.existing-id[data-index="' + idx + '"]');
+    if (!name) {
+        container.innerHTML = '';
+        existingId.value = '';
+        return;
+    }
+    fetch('/api/match-item?q=' + encodeURIComponent(name))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.match) {
+                var m = data.match;
+                var entries = m.entry_count === 1 ? 'entry' : 'entries';
+                container.innerHTML = '<fieldset class="match-choice">'
+                    + '<legend><small>Similar item found in database</small></legend>'
+                    + '<label><input type="radio" name="items[' + idx + '].match_action" value="existing" checked class="match-radio" data-index="' + idx + '">'
+                    + ' Add to existing: <strong>' + m.name + '</strong> (' + m.entry_count + ' ' + entries + ') \u2014 uses existing QR code</label>'
+                    + '<label><input type="radio" name="items[' + idx + '].match_action" value="new" class="match-radio" data-index="' + idx + '">'
+                    + ' Create as new item</label>'
+                    + '</fieldset>';
+                existingId.value = m.public_id;
+                // Re-bind radio change handlers
+                container.querySelectorAll('.match-radio').forEach(function(r) {
+                    r.addEventListener('change', function() { updateMatchActions(); });
+                });
+            } else {
+                container.innerHTML = '';
+                existingId.value = '';
+            }
+            updateMatchActions();
+        });
+}
+
+// Debounce name input changes
+document.querySelectorAll('input[type="text"][name$="].name"]').forEach(function(input) {
+    var match = input.name.match(/items\[(\d+)\]/);
+    if (!match) return;
+    var idx = match[1];
+    input.addEventListener('input', function() {
+        clearTimeout(matchTimers[idx]);
+        matchTimers[idx] = setTimeout(function() { checkNameMatch(idx); }, 500);
+    });
+});
+
+// Store original existing_id values
+document.querySelectorAll('.existing-id').forEach(function(el) {
+    if (el.value) el.setAttribute('data-original', el.value);
+});
+
+// Update on any change
+document.addEventListener('change', function() { updateMatchActions(); updateGroupKeys(); });
+document.addEventListener('input', updateGroupKeys);
+// Initialize on load
+updateMatchActions();
+updateGroupKeys();
+</script>
+{% endblock %}
