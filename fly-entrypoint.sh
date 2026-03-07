@@ -98,9 +98,8 @@ if os.path.exists(db_path):
     conn.close()
 "
 
-# Run with gunicorn + uvicorn workers
-exec gunicorn app.main:app \
-    --bind 0.0.0.0:8000 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --workers 1 \
-    --timeout 120
+# Run with uvicorn directly (saves ~40MB vs gunicorn master+worker)
+exec uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --timeout-keep-alive 120
