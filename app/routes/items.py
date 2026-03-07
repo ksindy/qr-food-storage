@@ -26,7 +26,7 @@ def _fuzzy_match(query, choices, cutoff=0.75):
 from app.config import GOOGLE_CLOUD_API_KEY
 from app.database import get_db
 from app.models import FoodItem, InventoryEntry, ItemRevision, RevisionLink, StorageLocation, Tag
-from app.ocr import extract_text, guess_food_name
+from app.ocr import extract_text, get_name_candidates, guess_food_name
 from app.photo import photo_url, save_photo
 from app.qr import generate_qr_png, item_url
 from app.templating import templates
@@ -324,6 +324,7 @@ async def bulk_upload_process(
             "filename": "",
             "photo_url": None,
             "name": "",
+            "name_candidates": [],
             "raw_text": "",
             "grouped": False,
             "group_key": "",
@@ -338,12 +339,14 @@ async def bulk_upload_process(
             continue
 
         raw_text = extract_text(filename)
-        name = guess_food_name(raw_text)
+        candidates = get_name_candidates(raw_text)
+        name = candidates[0] if candidates else ""
 
         items.append({
             "filename": filename,
             "photo_url": photo_url(filename),
             "name": name,
+            "name_candidates": candidates,
             "raw_text": raw_text,
             "grouped": False,
         })

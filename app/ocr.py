@@ -78,9 +78,16 @@ def extract_text(filename: str) -> str:
 
 def guess_food_name(raw_text: str) -> str:
     """Extract the most likely food name from OCR text."""
-    if not raw_text:
-        return ""
+    candidates = get_name_candidates(raw_text)
+    return candidates[0] if candidates else ""
 
+
+def get_name_candidates(raw_text: str) -> list:
+    """Return all non-noise lines from OCR text as candidate food names."""
+    if not raw_text:
+        return []
+
+    candidates = []
     for line in raw_text.splitlines():
         line = line.strip()
         if not line:
@@ -89,7 +96,6 @@ def guess_food_name(raw_text: str) -> str:
             continue
         if any(p.search(line) for p in NOISE_PATTERNS):
             continue
-        # Return first non-noise line, title-cased
-        return line.title()[:100]
+        candidates.append(line.title()[:100])
 
-    return ""
+    return candidates

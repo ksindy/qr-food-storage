@@ -26,7 +26,17 @@
             <div>
                 <label>
                     Name *
+                    {% if item.name_candidates|length > 1 %}
+                    <select name="items[{{ loop.index0 }}].name" required class="name-select" data-index="{{ loop.index0 }}">
+                        {% for c in item.name_candidates %}
+                        <option value="{{ c }}" {% if c == item.name %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                        <option value="__custom__">Type my own...</option>
+                    </select>
+                    <input type="text" class="name-custom" data-index="{{ loop.index0 }}" style="display:none;margin-top:0.25rem" placeholder="Enter name">
+                    {% else %}
                     <input type="text" name="items[{{ loop.index0 }}].name" value="{{ item.name }}" required>
+                    {% endif %}
                 </label>
                 <div class="grid">
                     <label>
@@ -103,14 +113,49 @@
 
 {% block scripts %}
 <script>
+// Get current name value for an item index (handles both select and text input)
+function getItemName(idx) {
+    var select = document.querySelector('.name-select[data-index="' + idx + '"]');
+    if (select) {
+        if (select.value === '__custom__') {
+            var custom = document.querySelector('.name-custom[data-index="' + idx + '"]');
+            return custom ? custom.value.trim() : '';
+        }
+        return select.value.trim();
+    }
+    var input = document.querySelector('input[name="items[' + idx + '].name"]');
+    return input ? input.value.trim() : '';
+}
+
+// Handle name-select dropdowns: show/hide custom input
+document.querySelectorAll('.name-select').forEach(function(select) {
+    var idx = select.getAttribute('data-index');
+    var custom = document.querySelector('.name-custom[data-index="' + idx + '"]');
+    if (!custom) return;
+    select.addEventListener('change', function() {
+        if (select.value === '__custom__') {
+            custom.style.display = '';
+            custom.setAttribute('name', 'items[' + idx + '].name');
+            custom.required = true;
+            select.removeAttribute('name');
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.removeAttribute('name');
+            custom.required = false;
+            select.setAttribute('name', 'items[' + idx + '].name');
+        }
+    });
+});
+
 // Update group_key hidden fields based on checkbox state and name values
 function updateGroupKeys() {
     document.querySelectorAll('.group-key').forEach(function(groupKey) {
         var idx = groupKey.getAttribute('data-index');
         var checkbox = document.querySelector('.group-checkbox[data-index="' + idx + '"]');
-        var nameInput = document.querySelector('input[name="items[' + idx + '].name"]');
-        if (checkbox && checkbox.checked && nameInput && nameInput.value.trim()) {
-            groupKey.value = nameInput.value.trim().toLowerCase();
+        var name = getItemName(idx);
+        if (checkbox && checkbox.checked && name) {
+            groupKey.value = name.toLowerCase();
         } else if (!checkbox) {
             // No checkbox means not grouped — keep server-set value cleared
             groupKey.value = '';
@@ -147,9 +192,7 @@ function updateMatchActions() {
 // Live fuzzy match: check name against DB when user edits it
 var matchTimers = {};
 function checkNameMatch(idx) {
-    var nameInput = document.querySelector('input[name="items[' + idx + '].name"]');
-    if (!nameInput) return;
-    var name = nameInput.value.trim();
+    var name = getItemName(idx);
     var container = document.querySelector('.match-container[data-index="' + idx + '"]');
     var existingId = document.querySelector('.existing-id[data-index="' + idx + '"]');
     if (!name) {
@@ -183,15 +226,25 @@ function checkNameMatch(idx) {
         });
 }
 
-// Debounce name input changes
-document.querySelectorAll('input[type="text"][name$="].name"]').forEach(function(input) {
-    var match = input.name.match(/items\[(\d+)\]/);
-    if (!match) return;
-    var idx = match[1];
-    input.addEventListener('input', function() {
+// Debounce name changes (text inputs, selects, and custom inputs)
+function bindNameMatch(el, idx) {
+    var event = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(event, function() {
         clearTimeout(matchTimers[idx]);
         matchTimers[idx] = setTimeout(function() { checkNameMatch(idx); }, 500);
     });
+}
+document.querySelectorAll('input[type="text"][name$="].name"]').forEach(function(input) {
+    var match = input.name.match(/items\[(\d+)\]/);
+    if (match) bindNameMatch(input, match[1]);
+});
+document.querySelectorAll('.name-select').forEach(function(select) {
+    var idx = select.getAttribute('data-index');
+    bindNameMatch(select, idx);
+});
+document.querySelectorAll('.name-custom').forEach(function(input) {
+    var idx = input.getAttribute('data-index');
+    bindNameMatch(input, idx);
 });
 
 // Store original existing_id values
