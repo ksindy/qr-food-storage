@@ -8,7 +8,20 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from rapidfuzz import process as fuzz_process, fuzz
+from difflib import SequenceMatcher
+
+
+def _fuzzy_match(query, choices, cutoff=0.75):
+    """Find the best fuzzy match for query among choices. Returns (match, score) or None."""
+    query_lower = query.lower()
+    best = None
+    best_score = 0.0
+    for choice in choices:
+        score = SequenceMatcher(None, query_lower, choice.lower()).ratio()
+        if score >= cutoff and score > best_score:
+            best = choice
+            best_score = score
+    return (best, best_score) if best else None
 
 from app.config import GOOGLE_CLOUD_API_KEY
 from app.database import get_db
@@ -383,9 +396,7 @@ async def bulk_upload_process(
     for item in items:
         item["existing_match"] = None
         if item["name"] and existing_names:
-            result = fuzz_process.extractOne(
-                item["name"], existing_names, scorer=fuzz.ratio, score_cutoff=75
-            )
+            result = _fuzzy_match(item["name"], existing_names)
             if result:
                 matched_name = result[0]
                 item["existing_match"] = existing_choices[matched_name]
@@ -574,9 +585,7 @@ def match_item(q: str = Query(""), db: Session = Depends(get_db)):
     if not choices:
         return {"match": None}
 
-    result = fuzz_process.extractOne(
-        q, list(choices.keys()), scorer=fuzz.ratio, score_cutoff=75
-    )
+    result = _fuzzy_match(q, list(choices.keys()))
     if result:
         return {"match": choices[result[0]]}
     return {"match": None}
